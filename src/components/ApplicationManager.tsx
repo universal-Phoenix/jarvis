@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import * as d3 from "d3";
 import {
   Download,
   Trash2,
@@ -31,8 +32,15 @@ import {
   Sliders,
   FileText,
   AlertTriangle,
+  Gauge,
+  Flame,
+  Wind,
+  CheckSquare,
+  Square,
+  ShieldAlert,
 } from "lucide-react";
 import { playJarvisBeep, playSuccessChime } from "../utils/jarvisAudio";
+import { NovaLifeFingerprintGuardian } from "./NovaLifeFingerprintGuardian";
 
 export interface SoftwarePackage {
   id: string;
@@ -253,13 +261,17 @@ export const ApplicationManager: React.FC = () => {
     return DEFAULT_PACKAGES;
   });
 
-  const [activeTab, setActiveTab] = useState<"software-center" | "system-diagnostics">(
-    "software-center"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "software-center" | "system-diagnostics" | "system-hardware" | "system-security"
+  >("software-center");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatusPackage, setSelectedStatusPackage] = useState<SoftwarePackage | null>(null);
   const [installProgress, setInstallProgress] = useState<{ id: string; percent: number } | null>(null);
+
+  // Multi-Select & Batch Installation States
+  const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
   // System Diagnostics View States
   const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>(INITIAL_LOGS);
@@ -270,12 +282,176 @@ export const ApplicationManager: React.FC = () => {
 
   const logContainerRef = useRef<HTMLDivElement>(null);
 
+  // Critical HUD Toast Alerts
+  const [criticalToast, setCriticalToast] = useState<{ message: string; type: "cpu" | "ram" } | null>(null);
+
+  // D3 Hardware Telemetry Stream State (20 history points)
+  const [hardwareHistory, setHardwareHistory] = useState<
+    Array<{ time: string; cpu: number; ram: number; disk: number; gpu: number }>
+  >(() => {
+    const now = Date.now();
+    return Array.from({ length: 20 }, (_, i) => ({
+      time: new Date(now - (20 - i) * 2000).toLocaleTimeString(),
+      cpu: Math.round(15 + Math.sin(i * 0.5) * 12),
+      ram: Math.round(32 + Math.cos(i * 0.4) * 8),
+      disk: Math.round(12 + Math.sin(i * 0.3) * 6),
+      gpu: Math.round(22 + Math.cos(i * 0.6) * 15),
+    }));
+  });
+
+  const cpuSvgRef = useRef<SVGSVGElement>(null);
+  const ramSvgRef = useRef<SVGSVGElement>(null);
+  const diskSvgRef = useRef<SVGSVGElement>(null);
+  const gpuSvgRef = useRef<SVGSVGElement>(null);
+
   // Save state updates to localStorage
   useEffect(() => {
     try {
       localStorage.setItem("ud_app_manager_states", JSON.stringify(packages));
     } catch {}
   }, [packages]);
+
+  // Simulated live hardware telemetry tick every 2s with auto-triggering critical toast check (>90% CPU or >85% RAM)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const nowStr = new Date().toLocaleTimeString();
+      setHardwareHistory((prev) => {
+        // Occasionally spike CPU or RAM to test auto-triggering hud alerts
+        const spikeTrigger = Math.random() > 0.82;
+        const nextCpu = spikeTrigger ? Math.floor(92 + Math.random() * 6) : Math.min(88, Math.max(12, Math.round(28 + (Math.random() - 0.5) * 20)));
+        const nextRam = spikeTrigger && Math.random() > 0.5 ? Math.floor(88 + Math.random() * 8) : Math.min(82, Math.max(28, Math.round(45 + (Math.random() - 0.5) * 8)));
+        const nextDisk = Math.min(80, Math.max(5, Math.round(14 + (Math.random() - 0.5) * 8)));
+        const nextGpu = Math.min(98, Math.max(10, Math.round(32 + (Math.random() - 0.5) * 25)));
+
+        // Check critical threshold
+        if (nextCpu > 90) {
+          setCriticalToast({ message: `CRITICAL CPU LOAD DETECTED: ${nextCpu}% on Broadcom BCM2712!`, type: "cpu" });
+          playJarvisBeep(600, "sawtooth", 0.3);
+          setTimeout(() => setCriticalToast(null), 4000);
+        } else if (nextRam > 85) {
+          setCriticalToast({ message: `CRITICAL RAM MEMORY CRITICAL: ${nextRam}% LPDDR4X utilized!`, type: "ram" });
+          playJarvisBeep(700, "sawtooth", 0.3);
+          setTimeout(() => setCriticalToast(null), 4000);
+        }
+
+        return [...prev.slice(1), { time: nowStr, cpu: nextCpu, ram: nextRam, disk: nextDisk, gpu: nextGpu }];
+      });
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // D3 Render Effect for Hardware Sparklines
+  useEffect(() => {
+    if (activeTab !== "system-hardware") return;
+
+    const renderD3Sparkline = (
+      svgEl: SVGSVGElement | null,
+      dataKey: "cpu" | "ram" | "disk" | "gpu",
+      strokeColor: string,
+      fillGradientId: string
+    ) => {
+      if (!svgEl) return;
+      const svg = d3.select(svgEl);
+      svg.selectAll("*").remove();
+
+      const width = svgEl.clientWidth || 320;
+      const height = svgEl.clientHeight || 140;
+      const margin = { top: 10, right: 10, bottom: 20, left: 30 };
+      const innerW = width - margin.left - margin.right;
+      const innerH = height - margin.top - margin.bottom;
+
+      const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const x = d3
+        .scalePoint()
+        .domain(hardwareHistory.map((d) => d.time))
+        .range([0, innerW]);
+
+      const y = d3.scaleLinear().domain([0, 100]).range([innerH, 0]);
+
+      g.append("g")
+        .attr("class", "grid")
+        .selectAll("line")
+        .data(y.ticks(4))
+        .enter()
+        .append("line")
+        .attr("x1", 0)
+        .attr("x2", innerW)
+        .attr("y1", (d) => y(d))
+        .attr("y2", (d) => y(d))
+        .attr("stroke", "#1e293b")
+        .attr("stroke-dasharray", "3,3");
+
+      const defs = svg.append("defs");
+      const gradient = defs
+        .append("linearGradient")
+        .attr("id", fillGradientId)
+        .attr("x1", "0%")
+        .attr("y1", "0%")
+        .attr("x2", "0%")
+        .attr("y2", "100%");
+
+      gradient.append("stop").attr("offset", "0%").attr("stop-color", strokeColor).attr("stop-opacity", 0.45);
+      gradient.append("stop").attr("offset", "100%").attr("stop-color", strokeColor).attr("stop-opacity", 0.0);
+
+      const areaGenerator = d3
+        .area<{ time: string; cpu: number; ram: number; disk: number; gpu: number }>()
+        .x((d) => x(d.time) || 0)
+        .y0(innerH)
+        .y1((d) => y(d[dataKey]))
+        .curve(d3.curveMonotoneX);
+
+      const lineGenerator = d3
+        .line<{ time: string; cpu: number; ram: number; disk: number; gpu: number }>()
+        .x((d) => x(d.time) || 0)
+        .y((d) => y(d[dataKey]))
+        .curve(d3.curveMonotoneX);
+
+      g.append("path")
+        .datum(hardwareHistory)
+        .attr("fill", `url(#${fillGradientId})`)
+        .attr("d", areaGenerator);
+
+      g.append("path")
+        .datum(hardwareHistory)
+        .attr("fill", "none")
+        .attr("stroke", strokeColor)
+        .attr("stroke-width", 2.5)
+        .attr("d", lineGenerator);
+
+      g.selectAll("circle")
+        .data(hardwareHistory)
+        .enter()
+        .append("circle")
+        .attr("cx", (d) => x(d.time) || 0)
+        .attr("cy", (d) => y(d[dataKey]))
+        .attr("r", 3)
+        .attr("fill", strokeColor);
+
+      g.append("g")
+        .attr("transform", `translate(0,${innerH})`)
+        .call(d3.axisBottom(x).ticks(4))
+        .selectAll("text")
+        .attr("fill", "#64748b")
+        .attr("font-size", "9px")
+        .style("text-anchor", "end")
+        .attr("dx", "-.8em")
+        .attr("dy", ".15em")
+        .attr("transform", "rotate(-25)");
+
+      g.append("g")
+        .call(d3.axisLeft(y).ticks(3))
+        .selectAll("text")
+        .attr("fill", "#64748b")
+        .attr("font-size", "9px");
+    };
+
+    renderD3Sparkline(cpuSvgRef.current, "cpu", "#22d3ee", "cpuGradient");
+    renderD3Sparkline(ramSvgRef.current, "ram", "#34d399", "ramGradient");
+    renderD3Sparkline(diskSvgRef.current, "disk", "#fbbf24", "diskGradient");
+    renderD3Sparkline(gpuSvgRef.current, "gpu", "#f43f5e", "gpuGradient");
+  }, [hardwareHistory, activeTab]);
 
   // Simulated live system log tick every 2.5s if not paused
   useEffect(() => {
@@ -338,6 +514,106 @@ export const ApplicationManager: React.FC = () => {
     setSystemLogs((prev) => [...prev, newLog]);
   };
 
+  const handleToggleSelectPackage = (id: string) => {
+    playJarvisBeep(1000, "sine", 0.02);
+    setSelectedPackageIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    playJarvisBeep(1100, "sine", 0.03);
+    if (selectedPackageIds.length === packages.length) {
+      setSelectedPackageIds([]);
+    } else {
+      setSelectedPackageIds(packages.map((p) => p.id));
+    }
+  };
+
+  // Batch Installation of Selected Packages
+  const handleBatchInstall = async () => {
+    if (selectedPackageIds.length === 0) return;
+    playJarvisBeep(1300, "sine", 0.04);
+    setIsBatchProcessing(true);
+
+    const targets = packages.filter((p) => selectedPackageIds.includes(p.id) && p.status !== "installed");
+
+    for (const pkg of targets) {
+      const assignedPid = Math.floor(8000 + Math.random() * 2000);
+      appendSystemLog(pkg, "INFO", `Batch Pipeline: Installing ${pkg.filename}...`);
+
+      setPackages((prev) =>
+        prev.map((p) => (p.id === pkg.id ? { ...p, status: "installing", pid: assignedPid } : p))
+      );
+
+      await new Promise((r) => setTimeout(r, 600));
+
+      setPackages((prev) =>
+        prev.map((p) =>
+          p.id === pkg.id
+            ? {
+                ...p,
+                status: "installed",
+                memoryMb: Math.floor(60 + Math.random() * 180),
+                cpuLoad: parseFloat((1.2 + Math.random() * 3).toFixed(1)),
+                signalState: "SIGCONT (Running)",
+                installStage: "SYSTEMD_ACTIVE",
+              }
+            : p
+        )
+      );
+
+      appendSystemLog(pkg, "SUCCESS", `Batch Pipeline: ${pkg.name} successfully installed [PID ${assignedPid}]`);
+    }
+
+    setIsBatchProcessing(false);
+    setSelectedPackageIds([]);
+    playSuccessChime();
+  };
+
+  // Batch Uninstallation of Selected Packages
+  const handleBatchUninstall = async () => {
+    if (selectedPackageIds.length === 0) return;
+    if (!window.confirm(`Uninstall all ${selectedPackageIds.length} selected packages?`)) return;
+
+    playJarvisBeep(900, "sine", 0.04);
+    setIsBatchProcessing(true);
+
+    const targets = packages.filter((p) => selectedPackageIds.includes(p.id) && p.status === "installed");
+
+    for (const pkg of targets) {
+      appendSystemLog(pkg, "WARN", `Batch Pipeline: Sending SIGTERM to PID ${pkg.pid || 8000}...`);
+
+      setPackages((prev) =>
+        prev.map((p) => (p.id === pkg.id ? { ...p, status: "uninstalling" } : p))
+      );
+
+      await new Promise((r) => setTimeout(r, 500));
+
+      setPackages((prev) =>
+        prev.map((p) =>
+          p.id === pkg.id
+            ? {
+                ...p,
+                status: "not-installed",
+                pid: undefined,
+                memoryMb: 0,
+                cpuLoad: 0,
+                signalState: "INACTIVE",
+                installStage: "NOT_INSTALLED",
+              }
+            : p
+        )
+      );
+
+      appendSystemLog(pkg, "INFO", `Batch Pipeline: Purged ${pkg.name} binaries.`);
+    }
+
+    setIsBatchProcessing(false);
+    setSelectedPackageIds([]);
+    playJarvisBeep(1400, "sine", 0.05);
+  };
+
   const handleInstallPackage = (pkg: SoftwarePackage) => {
     playJarvisBeep(1200, "sine", 0.04);
     const assignedPid = Math.floor(8000 + Math.random() * 2000);
@@ -348,7 +624,6 @@ export const ApplicationManager: React.FC = () => {
       `Initiating installation pipeline for ${pkg.filename} (${pkg.size})...`
     );
 
-    // Update status to installing
     setPackages((prev) =>
       prev.map((p) =>
         p.id === pkg.id
@@ -509,15 +784,33 @@ export const ApplicationManager: React.FC = () => {
   });
 
   const installedCount = packages.filter((p) => p.status === "installed").length;
+  const latestTelemetry = hardwareHistory[hardwareHistory.length - 1] || { cpu: 22, ram: 35, disk: 14, gpu: 30 };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 font-mono text-slate-100 pb-12 select-none">
+    <div className="w-full max-w-7xl mx-auto space-y-6 font-mono text-slate-100 pb-12 select-none relative">
+      {/* Critical HUD Alert Toast Notification Overlay */}
+      {criticalToast && (
+        <div className="fixed top-20 right-6 z-50 animate-bounce p-4 rounded-xl bg-rose-950/95 border-2 border-rose-500 text-rose-200 shadow-[0_0_30px_rgba(244,63,94,0.8)] backdrop-blur-md flex items-center gap-3 max-w-md">
+          <ShieldAlert className="w-6 h-6 text-rose-400 shrink-0 animate-pulse" />
+          <div className="space-y-0.5 text-xs">
+            <p className="font-extrabold tracking-wider">⚠️ CRITICAL THRESHOLD ALERT</p>
+            <p className="text-slate-200">{criticalToast.message}</p>
+          </div>
+          <button
+            onClick={() => setCriticalToast(null)}
+            className="p-1 rounded text-rose-400 hover:text-white cursor-pointer ml-auto"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 shadow-2xl">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-bold">
-              SYSTEM APPLICATION MANAGER
+              SYSTEM APPLICATION MANAGER & SECURITY GUARDIAN
             </span>
             <span className="px-2.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
               {installedCount} / {packages.length} INSTALLED
@@ -525,14 +818,14 @@ export const ApplicationManager: React.FC = () => {
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2 font-['Space_Grotesk']">
             <Box className="w-7 h-7 text-emerald-400" />
-            <span>Software Center & System Diagnostics</span>
+            <span>Software Center, Hardware D3 & Biometric Security</span>
           </h1>
           <p className="text-xs text-slate-400">
-            Install, manage, inspect, and monitor process signals & real-time installation logs for Android APKs, Pi 5 Debian packages, and NOVA runtimes.
+            Multi-select batch installation, real-time D3 hardware telemetry, and N.O.V.A. Life Cyber Security Fingerprint Guardian.
           </p>
         </div>
 
-        {/* View Mode Switcher: Software Center vs System Diagnostics */}
+        {/* View Mode Switcher Tabs */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold">
             <button
@@ -540,13 +833,13 @@ export const ApplicationManager: React.FC = () => {
                 playJarvisBeep(1100, "sine", 0.04);
                 setActiveTab("software-center");
               }}
-              className={`px-3.5 py-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
                 activeTab === "software-center"
                   ? "bg-emerald-500 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.5)] font-extrabold"
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              <Box className="w-4 h-4" />
+              <Box className="w-3.5 h-3.5" />
               <span>Software Center</span>
             </button>
 
@@ -555,15 +848,45 @@ export const ApplicationManager: React.FC = () => {
                 playJarvisBeep(1200, "sine", 0.04);
                 setActiveTab("system-diagnostics");
               }}
-              className={`px-3.5 py-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
                 activeTab === "system-diagnostics"
                   ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.5)] font-extrabold"
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              <Activity className="w-4 h-4" />
-              <span>System Diagnostics</span>
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <Activity className="w-3.5 h-3.5" />
+              <span>Diagnostics Logs</span>
+            </button>
+
+            <button
+              onClick={() => {
+                playJarvisBeep(1300, "sine", 0.04);
+                setActiveTab("system-hardware");
+              }}
+              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeTab === "system-hardware"
+                  ? "bg-amber-400 text-slate-950 shadow-[0_0_12px_rgba(251,191,36,0.5)] font-extrabold"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Gauge className="w-3.5 h-3.5" />
+              <span>System Hardware (D3)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                playJarvisBeep(1400, "sine", 0.04);
+                setActiveTab("system-security");
+              }}
+              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeTab === "system-security"
+                  ? "bg-rose-500 text-slate-950 shadow-[0_0_12px_rgba(244,63,94,0.5)] font-extrabold"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>N.O.V.A. Life Security</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
             </button>
           </div>
 
@@ -580,52 +903,46 @@ export const ApplicationManager: React.FC = () => {
 
       {/* VIEW 1: SOFTWARE CENTER */}
       {activeTab === "software-center" && (
-        <>
-          {/* Filter & Search Bar */}
+        <div className="space-y-4">
+          {/* Filter, Search & Batch Select All Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800">
-            {/* Category Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              {[
-                { id: "all", label: "All Software", count: packages.length },
-                {
-                  id: "mobile-apk",
-                  label: "Android APKs",
-                  count: packages.filter((p) => p.category === "mobile-apk").length,
-                },
-                {
-                  id: "pi5-deb",
-                  label: "Pi 5 Debian (.deb)",
-                  count: packages.filter((p) => p.category === "pi5-deb").length,
-                },
-                {
-                  id: "nova-runtime",
-                  label: "NOVA Runtimes",
-                  count: packages.filter((p) => p.category === "nova-runtime").length,
-                },
-                {
-                  id: "script",
-                  label: "Scripts",
-                  count: packages.filter((p) => p.category === "script").length,
-                },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    playJarvisBeep(1100, "sine", 0.03);
-                    setActiveCategory(cat.id);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                    activeCategory === cat.id
-                      ? "bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-                      : "bg-slate-950 text-slate-400 hover:text-white border border-slate-850"
-                  }`}
-                >
-                  <span>{cat.label}</span>
-                  <span className="px-1.5 py-0.2 rounded-full bg-slate-900/80 text-[10px]">
-                    {cat.count}
-                  </span>
-                </button>
-              ))}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSelectAll}
+                className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-850 text-cyan-400 border border-slate-800 text-xs font-bold cursor-pointer flex items-center gap-1.5"
+              >
+                {selectedPackageIds.length === packages.length ? (
+                  <CheckSquare className="w-4 h-4 text-cyan-400" />
+                ) : (
+                  <Square className="w-4 h-4 text-slate-500" />
+                )}
+                <span>{selectedPackageIds.length === packages.length ? "Deselect All" : "Select All"}</span>
+              </button>
+
+              {/* Category Tabs */}
+              <div className="hidden sm:flex flex-wrap items-center gap-1.5 text-xs">
+                {[
+                  { id: "all", label: "All", count: packages.length },
+                  { id: "mobile-apk", label: "APKs", count: packages.filter((p) => p.category === "mobile-apk").length },
+                  { id: "pi5-deb", label: "Pi5 (.deb)", count: packages.filter((p) => p.category === "pi5-deb").length },
+                  { id: "nova-runtime", label: "Runtimes", count: packages.filter((p) => p.category === "nova-runtime").length },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      playJarvisBeep(1100, "sine", 0.03);
+                      setActiveCategory(cat.id);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                      activeCategory === cat.id
+                        ? "bg-cyan-500 text-slate-950"
+                        : "bg-slate-950 text-slate-400 hover:text-white border border-slate-850"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Instant Search Input */}
@@ -635,7 +952,7 @@ export const ApplicationManager: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search packages by name or developer..."
+                placeholder="Search packages..."
                 className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
               />
               {searchQuery && (
@@ -649,17 +966,57 @@ export const ApplicationManager: React.FC = () => {
             </div>
           </div>
 
+          {/* Floating Bulk Action Bar when items selected */}
+          {selectedPackageIds.length > 0 && (
+            <div className="sticky top-4 z-40 flex items-center justify-between p-4 rounded-xl bg-cyan-950/95 border-2 border-cyan-500 text-cyan-200 shadow-2xl backdrop-blur-md animate-fade-in">
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <CheckSquare className="w-4 h-4 text-cyan-400" />
+                <span>{selectedPackageIds.length} software packages selected</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleBatchInstall}
+                  disabled={isBatchProcessing}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isBatchProcessing ? "Processing..." : "Install Selected"}</span>
+                </button>
+
+                <button
+                  onClick={handleBatchUninstall}
+                  disabled={isBatchProcessing}
+                  className="px-3 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Uninstall Selected</span>
+                </button>
+
+                <button
+                  onClick={() => setSelectedPackageIds([])}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white text-xs cursor-pointer"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Software Packages Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredPackages.map((pkg) => {
               const isInstalled = pkg.status === "installed";
               const isInstalling = pkg.status === "installing";
               const isUninstalling = pkg.status === "uninstalling";
+              const isSelected = selectedPackageIds.includes(pkg.id);
 
               return (
                 <div
                   key={pkg.id}
-                  className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden"
+                  className={`p-5 rounded-2xl bg-slate-900/90 border transition-all flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden ${
+                    isSelected ? "border-cyan-500/80 shadow-[0_0_15px_rgba(34,211,238,0.2)]" : "border-slate-800 hover:border-slate-700"
+                  }`}
                 >
                   {/* Progress Overlay during installation */}
                   {isInstalling && (
@@ -679,6 +1036,19 @@ export const ApplicationManager: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
+                        {/* Checkbox for Multi-Select */}
+                        <button
+                          onClick={() => handleToggleSelectPackage(pkg.id)}
+                          className="p-1 rounded cursor-pointer text-slate-400 hover:text-cyan-400"
+                          title="Select package for batch action"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-cyan-400" />
+                          ) : (
+                            <Square className="w-5 h-5 text-slate-600 hover:text-slate-400" />
+                          )}
+                        </button>
+
                         <span className="text-3xl p-2 rounded-xl bg-slate-950 border border-slate-800 shrink-0">
                           {pkg.icon}
                         </span>
@@ -729,31 +1099,26 @@ export const ApplicationManager: React.FC = () => {
                   {/* Action Buttons Toolbar: Install, Uninstall, Status */}
                   <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
-                      {/* STATUS BUTTON */}
                       <button
                         onClick={() => {
                           playJarvisBeep(1100, "sine", 0.03);
                           setSelectedStatusPackage(pkg);
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold cursor-pointer transition-all flex items-center gap-1"
-                        title="View Package Status & Diagnostic Details"
                       >
                         <Info className="w-3.5 h-3.5 text-cyan-400" />
                         <span>Status</span>
                       </button>
 
-                      {/* FILE DOWNLOAD PACKAGE BUTTON */}
                       <a
                         href={pkg.downloadUrl}
                         download={pkg.filename}
                         className="px-2 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-cyan-300 border border-slate-800 text-xs cursor-pointer transition-all"
-                        title={`Download real ${pkg.filename} file`}
                       >
                         <Download className="w-3.5 h-3.5" />
                       </a>
                     </div>
 
-                    {/* INSTALL / UNINSTALL BUTTONS */}
                     <div>
                       {isInstalled ? (
                         <button
@@ -780,13 +1145,12 @@ export const ApplicationManager: React.FC = () => {
               );
             })}
           </div>
-        </>
+        </div>
       )}
 
-      {/* VIEW 2: SYSTEM DIAGNOSTICS & PROCESS SIGNALS */}
+      {/* VIEW 2: SYSTEM DIAGNOSTICS */}
       {activeTab === "system-diagnostics" && (
         <div className="space-y-6">
-          {/* Per-Package Process Signals & Live Status Grid */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white flex items-center gap-2 tracking-wider uppercase">
@@ -826,7 +1190,6 @@ export const ApplicationManager: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Stage & Signal Indicators */}
                   <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-850 space-y-1 text-[11px] font-mono">
                     <div className="flex items-center justify-between text-slate-300">
                       <span>Signal State:</span>
@@ -848,13 +1211,11 @@ export const ApplicationManager: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Interactive Process Signal Dispatch Buttons */}
                   <div className="flex items-center justify-between gap-1 text-[10px]">
                     <button
                       onClick={() => handleSendSignalToPackage(pkg, "SIGUSR1")}
                       disabled={pkg.status !== "installed"}
                       className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer disabled:opacity-40"
-                      title="Send SIGUSR1 (Health Check signal)"
                     >
                       SIGUSR1
                     </button>
@@ -862,7 +1223,6 @@ export const ApplicationManager: React.FC = () => {
                       onClick={() => handleSendSignalToPackage(pkg, "SIGCONT")}
                       disabled={pkg.status !== "installed"}
                       className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-white cursor-pointer disabled:opacity-40"
-                      title="Send SIGCONT (Resume signal)"
                     >
                       SIGCONT
                     </button>
@@ -870,7 +1230,6 @@ export const ApplicationManager: React.FC = () => {
                       onClick={() => handleSendSignalToPackage(pkg, "SIGTERM")}
                       disabled={pkg.status !== "installed"}
                       className="px-2 py-1 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 cursor-pointer disabled:opacity-40"
-                      title="Send SIGTERM (Graceful termination)"
                     >
                       SIGTERM
                     </button>
@@ -880,9 +1239,7 @@ export const ApplicationManager: React.FC = () => {
             </div>
           </div>
 
-          {/* Real-Time Live System Log Console */}
           <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-2xl">
-            {/* Console Toolbar Controls */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-cyan-400" />
@@ -895,7 +1252,6 @@ export const ApplicationManager: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                {/* Level Filter */}
                 <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[10px]">
                   {["ALL", "INFO", "EXEC", "SIGNAL", "SUCCESS", "WARN"].map((lvl) => (
                     <button
@@ -912,7 +1268,6 @@ export const ApplicationManager: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Pause / Resume Button */}
                 <button
                   onClick={() => setIsStreamPaused((prev) => !prev)}
                   className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1 ${
@@ -921,20 +1276,9 @@ export const ApplicationManager: React.FC = () => {
                       : "bg-slate-800 text-slate-300 hover:text-white"
                   }`}
                 >
-                  {isStreamPaused ? (
-                    <>
-                      <Play className="w-3 h-3 fill-current" />
-                      <span>Resume Stream</span>
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="w-3 h-3 fill-current" />
-                      <span>Pause Stream</span>
-                    </>
-                  )}
+                  {isStreamPaused ? "Resume Stream" : "Pause Stream"}
                 </button>
 
-                {/* Clear Logs */}
                 <button
                   onClick={() => setSystemLogs([])}
                   className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-[10px] cursor-pointer"
@@ -944,7 +1288,6 @@ export const ApplicationManager: React.FC = () => {
               </div>
             </div>
 
-            {/* Log Stream Output Box */}
             <div
               ref={logContainerRef}
               className="h-80 w-full p-4 rounded-xl bg-slate-950 border border-slate-850 overflow-y-auto font-mono text-xs leading-relaxed space-y-1.5 select-text"
@@ -960,7 +1303,6 @@ export const ApplicationManager: React.FC = () => {
                     <span className="text-slate-500 shrink-0 text-[10px] font-mono pt-0.5">
                       [{log.timestamp}]
                     </span>
-
                     <span
                       className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
                         log.level === "INFO"
@@ -976,11 +1318,9 @@ export const ApplicationManager: React.FC = () => {
                     >
                       {log.level}
                     </span>
-
                     <span className="text-cyan-400 font-bold shrink-0">
                       [{log.packageName}]
                     </span>
-
                     <span className="text-slate-300">{log.message}</span>
                   </div>
                 ))
@@ -989,6 +1329,162 @@ export const ApplicationManager: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* VIEW 3: SYSTEM HARDWARE (D3 CHARTS & RASPBERRY PI 5 GPU) */}
+      {activeTab === "system-hardware" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl bg-slate-900/90 border border-cyan-800/50 backdrop-blur-md space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
+                <span className="flex items-center gap-1.5 text-cyan-400">
+                  <Cpu className="w-4 h-4" />
+                  <span>CPU LOAD (BCM2712)</span>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 text-[10px]">
+                  4x Cortex-A76
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between font-mono">
+                <span className="text-3xl font-extrabold text-white">{latestTelemetry.cpu}%</span>
+                <span className="text-xs text-cyan-400">2.40 GHz</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    latestTelemetry.cpu > 90 ? "bg-rose-500 animate-pulse" : "bg-cyan-400"
+                  }`}
+                  style={{ width: `${latestTelemetry.cpu}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900/90 border border-rose-800/50 backdrop-blur-md space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
+                <span className="flex items-center gap-1.5 text-rose-400">
+                  <Zap className="w-4 h-4" />
+                  <span>PI 5 GPU (VIDEOCORE VII)</span>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 text-[10px]">
+                  800 MHz V3D
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between font-mono">
+                <span className="text-3xl font-extrabold text-white">{latestTelemetry.gpu}%</span>
+                <span className="text-xs text-rose-400">42.4°C GPU</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-rose-500 transition-all duration-500"
+                  style={{ width: `${latestTelemetry.gpu}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900/90 border border-emerald-800/50 backdrop-blur-md space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <HardDrive className="w-4 h-4" />
+                  <span>RAM RSS (8GB LPDDR4X)</span>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 text-[10px]">
+                  3.2 GB / 8.0 GB
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between font-mono">
+                <span className="text-3xl font-extrabold text-white">{latestTelemetry.ram}%</span>
+                <span className="text-xs text-emerald-400">Active Buffer</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    latestTelemetry.ram > 85 ? "bg-rose-500 animate-pulse" : "bg-emerald-400"
+                  }`}
+                  style={{ width: `${latestTelemetry.ram}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900/90 border border-amber-800/50 backdrop-blur-md space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
+                <span className="flex items-center gap-1.5 text-amber-400">
+                  <Radio className="w-4 h-4" />
+                  <span>NVMe DISK I/O</span>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 text-[10px]">
+                  PCIe Gen 3
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between font-mono">
+                <span className="text-3xl font-extrabold text-white">{latestTelemetry.disk} MB/s</span>
+                <span className="text-xs text-amber-400">Read / Write</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-amber-400 transition-all duration-500"
+                  style={{ width: `${latestTelemetry.disk}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between text-xs">
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-cyan-400" />
+                  <span>Broadcom BCM2712 CPU Load History (D3)</span>
+                </h3>
+                <span className="text-cyan-400 font-mono font-bold">{latestTelemetry.cpu}%</span>
+              </div>
+              <div className="w-full h-36 bg-slate-950 rounded-xl p-2 overflow-hidden border border-slate-850">
+                <svg ref={cpuSvgRef} className="w-full h-full" />
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between text-xs">
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-rose-400" />
+                  <span>Pi 5 GPU VideoCore VII / V3D Shader Load (D3)</span>
+                </h3>
+                <span className="text-rose-400 font-mono font-bold">{latestTelemetry.gpu}%</span>
+              </div>
+              <div className="w-full h-36 bg-slate-950 rounded-xl p-2 overflow-hidden border border-slate-850">
+                <svg ref={gpuSvgRef} className="w-full h-full" />
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between text-xs">
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-emerald-400" />
+                  <span>8GB LPDDR4X RAM Allocation (D3)</span>
+                </h3>
+                <span className="text-emerald-400 font-mono font-bold">{latestTelemetry.ram}%</span>
+              </div>
+              <div className="w-full h-36 bg-slate-950 rounded-xl p-2 overflow-hidden border border-slate-850">
+                <svg ref={ramSvgRef} className="w-full h-full" />
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between text-xs">
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <Radio className="w-4 h-4 text-amber-400" />
+                  <span>NVMe Disk Throughput MB/s (D3)</span>
+                </h3>
+                <span className="text-amber-400 font-mono font-bold">{latestTelemetry.disk} MB/s</span>
+              </div>
+              <div className="w-full h-36 bg-slate-950 rounded-xl p-2 overflow-hidden border border-slate-850">
+                <svg ref={diskSvgRef} className="w-full h-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 4: N.O.V.A. LIFE SECURITY (FINGERPRINT GUARDIAN) */}
+      {activeTab === "system-security" && <NovaLifeFingerprintGuardian />}
 
       {/* Package Status & Diagnostics Detail Modal Drawer */}
       {selectedStatusPackage && (

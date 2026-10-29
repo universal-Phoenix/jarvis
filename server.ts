@@ -543,37 +543,57 @@ app.post("/api/tts", async (req, res) => {
       });
       base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     } catch (flagshipErr: any) {
-      console.warn("gemini-3.8-flash-tts fallback notice:", flagshipErr.message);
-      // Fallback: gemini-3.8-flash-lite-tts
-      const fallbackResponse = await ai.models.generateContent({
-        model: "gemini-3.8-flash-lite-tts",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: text.slice(0, 400),
-                speechMetadata: {
-                  style: stylePrompt,
+      const isQuota =
+        flagshipErr.message?.includes("429") ||
+        flagshipErr.message?.includes("RESOURCE_EXHAUSTED") ||
+        flagshipErr.status === 429;
+
+      if (!isQuota) {
+        console.warn("gemini-3.8-flash-tts notice:", flagshipErr.message);
+      }
+
+      try {
+        // Fallback: gemini-3.8-flash-lite-tts
+        const fallbackResponse = await ai.models.generateContent({
+          model: "gemini-3.8-flash-lite-tts",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: text.slice(0, 400),
+                  speechMetadata: {
+                    style: stylePrompt,
+                  },
                 },
+              ],
+            },
+          ],
+          config: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: voice || "Fenrir" },
               },
-            ],
-          },
-        ],
-        config: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voice || "Fenrir" },
             },
           },
-        },
-      });
-      base64Audio = fallbackResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        });
+        base64Audio = fallbackResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      } catch (liteErr: any) {
+        return res.json({
+          success: false,
+          fallbackToClient: true,
+          message: "TTS API quota reached. Switching to Web Speech Synthesis.",
+        });
+      }
     }
 
     if (!base64Audio) {
-      return res.status(500).json({ error: "Failed to generate speech audio." });
+      return res.json({
+        success: false,
+        fallbackToClient: true,
+        message: "Audio stream unavailable. Switching to Web Speech Synthesis.",
+      });
     }
 
     return res.json({
@@ -581,9 +601,10 @@ app.post("/api/tts", async (req, res) => {
       audioUrl: `data:audio/wav;base64,${base64Audio}`,
     });
   } catch (error: any) {
-    console.warn("TTS generation warning (client fallback will be used):", error.message);
-    return res.status(500).json({
-      error: error.message || "TTS currently unavailable, fallback to Web Speech Synthesis.",
+    return res.json({
+      success: false,
+      fallbackToClient: true,
+      message: "TTS currently unavailable. Switching to Web Speech Synthesis.",
     });
   }
 });
@@ -744,7 +765,9 @@ RULES:
       });
       base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     } catch (ttsErr: any) {
-      console.warn("Video call TTS fallback notice:", ttsErr.message);
+      if (!ttsErr.message?.includes("429") && !ttsErr.message?.includes("RESOURCE_EXHAUSTED")) {
+        console.warn("Video call TTS notice:", ttsErr.message);
+      }
     }
 
     return res.json({

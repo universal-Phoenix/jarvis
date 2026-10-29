@@ -442,7 +442,7 @@ export default function App() {
 
       {/* Global Keyboard Shortcut Manager & Command Palette (Ctrl+K, Ctrl+Space, etc.) */}
       <CommandPaletteAndShortcuts
-        onSelectView={setActiveView}
+        onSelectView={(v) => setActiveView(v as any)}
         onToggleChat={() => setIsChatOpen((prev) => !prev)}
         onToggleVoice={handleToggleVoice}
         voiceEnabled={voiceEnabled}

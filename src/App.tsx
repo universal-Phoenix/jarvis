@@ -19,6 +19,7 @@ import { OmniVideoLab } from "./components/OmniVideoLab";
 import { SearchAndVoiceTranscribe } from "./components/SearchAndVoiceTranscribe";
 import { RealAccessTerminal } from "./components/RealAccessTerminal";
 import { ApplicationManager } from "./components/ApplicationManager";
+import { CommandPaletteAndShortcuts } from "./components/CommandPaletteAndShortcuts";
 import { BrandBible } from "./types/brand";
 import { VoicePersona, CelestialTheme, OFFICIAL_VOICE_PERSONAS } from "./types/voice";
 import {
@@ -437,6 +438,18 @@ export default function App() {
       <CosmicCelestialBackground
         currentTheme={celestialTheme}
         onThemeChange={setCelestialTheme}
+      />
+
+      {/* Global Keyboard Shortcut Manager & Command Palette (Ctrl+K, Ctrl+Space, etc.) */}
+      <CommandPaletteAndShortcuts
+        onSelectView={setActiveView}
+        onToggleChat={() => setIsChatOpen((prev) => !prev)}
+        onToggleVoice={handleToggleVoice}
+        voiceEnabled={voiceEnabled}
+        onPlayBriefing={handlePlayJarvisBriefing}
+        onThemeChange={setCelestialTheme}
+        currentTheme={celestialTheme}
+        activeView={activeView}
       />
 
       {/* Top Navigation */}

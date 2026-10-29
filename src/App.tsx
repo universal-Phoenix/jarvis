@@ -18,6 +18,7 @@ import { ScienceGenomicsLab } from "./components/ScienceGenomicsLab";
 import { OmniVideoLab } from "./components/OmniVideoLab";
 import { SearchAndVoiceTranscribe } from "./components/SearchAndVoiceTranscribe";
 import { RealAccessTerminal } from "./components/RealAccessTerminal";
+import { ApplicationManager } from "./components/ApplicationManager";
 import { BrandBible } from "./types/brand";
 import { VoicePersona, CelestialTheme, OFFICIAL_VOICE_PERSONAS } from "./types/voice";
 import {
@@ -44,6 +45,7 @@ import {
   Search,
   Radio,
   Terminal,
+  Gauge,
 } from "lucide-react";
 
 // Initial Demo Brand for immediate pristine showcase: Universal Dragon by Universal Dragon Aslam
@@ -202,6 +204,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<
     | "dashboard"
     | "terminal"
+    | "app-manager"
     | "3d-core"
     | "science"
     | "video-lab"
@@ -505,6 +508,23 @@ export default function App() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             </button>
 
+            {/* Tab: Application Manager & Software Center */}
+            <button
+              onClick={() => {
+                playJarvisBeep(1300, "sine", 0.04);
+                setActiveView("app-manager");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === "app-manager"
+                  ? "bg-emerald-400 text-slate-950 shadow-[0_0_12px_rgba(52,211,153,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-emerald-400 hover:text-white border border-emerald-900/50"
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>SOFTWARE CENTER</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            </button>
+
             {/* Tab 2: 3D Quantum Dragon Core (Three.js) */}
             <button
               onClick={() => {
@@ -652,6 +672,8 @@ export default function App() {
           <BrandGeneratorForm onGenerate={handleGenerateBrand} isLoading={isLoading} />
         ) : activeView === "terminal" ? (
           <RealAccessTerminal brandName={brand.brandName} defaultSize="fullscreen" />
+        ) : activeView === "app-manager" ? (
+          <ApplicationManager />
         ) : activeView === "3d-core" ? (
           <ThreeDimensionalDragonScene />
         ) : activeView === "science" ? (

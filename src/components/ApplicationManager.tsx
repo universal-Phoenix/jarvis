@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Download,
   Trash2,
@@ -26,6 +26,11 @@ import {
   X,
   ChevronRight,
   Zap,
+  Activity,
+  Pause,
+  Sliders,
+  FileText,
+  AlertTriangle,
 } from "lucide-react";
 import { playJarvisBeep, playSuccessChime } from "../utils/jarvisAudio";
 
@@ -45,6 +50,21 @@ export interface SoftwarePackage {
   filename: string;
   downloadUrl: string;
   status: "installed" | "not-installed" | "installing" | "uninstalling";
+  pid?: number;
+  memoryMb?: number;
+  cpuLoad?: number;
+  signalState?: string;
+  installStage?: string;
+}
+
+export interface SystemLogEntry {
+  id: string;
+  timestamp: string;
+  packageId: string;
+  packageName: string;
+  level: "INFO" | "EXEC" | "SIGNAL" | "WARN" | "SUCCESS" | "ERROR";
+  message: string;
+  pid?: number;
 }
 
 const DEFAULT_PACKAGES: SoftwarePackage[] = [
@@ -64,6 +84,11 @@ const DEFAULT_PACKAGES: SoftwarePackage[] = [
     filename: "UniversalDragon_v6.1_arm64.apk",
     downloadUrl: "/api/apps/download/ud-mobile-apk",
     status: "installed",
+    pid: 8042,
+    memoryMb: 112,
+    cpuLoad: 3.4,
+    signalState: "SIGCONT (Running)",
+    installStage: "POSTINST / READY",
   },
   {
     id: "app-nova-bridge",
@@ -81,6 +106,11 @@ const DEFAULT_PACKAGES: SoftwarePackage[] = [
     filename: "NOVA_Mobile_Bridge_v4.8.apk",
     downloadUrl: "/api/apps/download/nova-bridge-apk",
     status: "installed",
+    pid: 9114,
+    memoryMb: 68,
+    cpuLoad: 1.8,
+    signalState: "SIGCONT (Active)",
+    installStage: "BRIDGE_LISTEN",
   },
   {
     id: "app-qbit-nova-c",
@@ -98,6 +128,11 @@ const DEFAULT_PACKAGES: SoftwarePackage[] = [
     filename: "qbit-nova-c_v4.8.0_arm64.deb",
     downloadUrl: "/api/apps/download/pi5-qbit-deb",
     status: "installed",
+    pid: 14092,
+    memoryMb: 215,
+    cpuLoad: 5.2,
+    signalState: "SIGUSR1 (Healthy)",
+    installStage: "SYSTEMD_SERVICE",
   },
   {
     id: "app-udos-2100",
@@ -115,6 +150,11 @@ const DEFAULT_PACKAGES: SoftwarePackage[] = [
     filename: "UDOS_2100_Sovereign_OS.apk",
     downloadUrl: "/api/apps/download/udos-mobile-apk",
     status: "not-installed",
+    pid: undefined,
+    memoryMb: 0,
+    cpuLoad: 0,
+    signalState: "INACTIVE",
+    installStage: "NOT_INSTALLED",
   },
   {
     id: "app-novakutty-brain",
@@ -132,6 +172,11 @@ const DEFAULT_PACKAGES: SoftwarePackage[] = [
     filename: "novakutty-pi5-v0.4.tar.gz",
     downloadUrl: "/api/apps/download/novakutty-weights",
     status: "installed",
+    pid: 12401,
+    memoryMb: 480,
+    cpuLoad: 2.1,
+    signalState: "SIGCONT (Warm)",
+    installStage: "OLLAMA_MOUNTED",
   },
   {
     id: "app-hyper-dragon-installer",
@@ -149,6 +194,50 @@ const DEFAULT_PACKAGES: SoftwarePackage[] = [
     filename: "install_hyper_dragon_pi5.sh",
     downloadUrl: "/api/apps/download/pi5-auto-install",
     status: "not-installed",
+    pid: undefined,
+    memoryMb: 0,
+    cpuLoad: 0,
+    signalState: "INACTIVE",
+    installStage: "NOT_INSTALLED",
+  },
+];
+
+const INITIAL_LOGS: SystemLogEntry[] = [
+  {
+    id: "log-1",
+    timestamp: new Date(Date.now() - 15000).toLocaleTimeString(),
+    packageId: "app-qbit-nova-c",
+    packageName: "qbit-nova-c BCM2712 Runtime",
+    level: "INFO",
+    message: "Initializing BCM2712 actor runtime core v4.8.0...",
+    pid: 14092,
+  },
+  {
+    id: "log-2",
+    timestamp: new Date(Date.now() - 12000).toLocaleTimeString(),
+    packageId: "app-novakutty-brain",
+    packageName: "Novakutty Pi 5 Offline Local Brain",
+    level: "EXEC",
+    message: "Ollama local weights loaded into RAM (480MB RSS | Tamil dialect active)",
+    pid: 12401,
+  },
+  {
+    id: "log-3",
+    timestamp: new Date(Date.now() - 8000).toLocaleTimeString(),
+    packageId: "app-nova-bridge",
+    packageName: "NOVA Mobile Camera & Voice Bridge",
+    level: "SIGNAL",
+    message: "Process signal SIGCONT received from Huawei Pura 70 Termux listener",
+    pid: 9114,
+  },
+  {
+    id: "log-4",
+    timestamp: new Date(Date.now() - 4000).toLocaleTimeString(),
+    packageId: "app-ud-mobile",
+    packageName: "Universal Dragon Mobile Companion",
+    level: "SUCCESS",
+    message: "Package verify SHA256 passed: 8f9a2b... [Install status: INSTALLED]",
+    pid: 8042,
   },
 ];
 
@@ -164,10 +253,22 @@ export const ApplicationManager: React.FC = () => {
     return DEFAULT_PACKAGES;
   });
 
+  const [activeTab, setActiveTab] = useState<"software-center" | "system-diagnostics">(
+    "software-center"
+  );
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatusPackage, setSelectedStatusPackage] = useState<SoftwarePackage | null>(null);
   const [installProgress, setInstallProgress] = useState<{ id: string; percent: number } | null>(null);
+
+  // System Diagnostics View States
+  const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>(INITIAL_LOGS);
+  const [isStreamPaused, setIsStreamPaused] = useState(false);
+  const [logLevelFilter, setLogLevelFilter] = useState<string>("ALL");
+  const [logSearchQuery, setLogSearchQuery] = useState("");
+  const [selectedLogPackageId, setSelectedLogPackageId] = useState<string>("ALL");
+
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   // Save state updates to localStorage
   useEffect(() => {
@@ -176,29 +277,139 @@ export const ApplicationManager: React.FC = () => {
     } catch {}
   }, [packages]);
 
+  // Simulated live system log tick every 2.5s if not paused
+  useEffect(() => {
+    if (isStreamPaused) return;
+
+    const interval = setInterval(() => {
+      const installedPkgs = packages.filter((p) => p.status === "installed");
+      if (installedPkgs.length === 0) return;
+
+      const randomPkg = installedPkgs[Math.floor(Math.random() * installedPkgs.length)];
+      const logMessages = [
+        `Heartbeat signal check SIGUSR1 ok for PID ${randomPkg.pid || 8000}`,
+        `Memory RSS check: ${randomPkg.memoryMb || 120}MB allocated on Broadcom BCM2712`,
+        `Direct IPC pipe ping to pi5.universaldragon.com:22 (latency: 1.2ms)`,
+        `Process signal SIGCONT verified for ${randomPkg.filename}`,
+        `Ollama acoustic sync tick: Tamil/Tanglish audio buffer ready`,
+      ];
+
+      const levels: SystemLogEntry["level"][] = ["INFO", "EXEC", "SIGNAL", "SUCCESS"];
+      const selectedLevel = levels[Math.floor(Math.random() * levels.length)];
+      const selectedMsg = logMessages[Math.floor(Math.random() * logMessages.length)];
+
+      const newEntry: SystemLogEntry = {
+        id: `log-${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString(),
+        packageId: randomPkg.id,
+        packageName: randomPkg.name,
+        level: selectedLevel,
+        message: selectedMsg,
+        pid: randomPkg.pid || Math.floor(8000 + Math.random() * 2000),
+      };
+
+      setSystemLogs((prev) => [...prev.slice(-120), newEntry]);
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [packages, isStreamPaused]);
+
+  // Auto scroll logs container when new logs arrive in diagnostics view
+  useEffect(() => {
+    if (activeTab === "system-diagnostics" && logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [systemLogs, activeTab]);
+
+  const appendSystemLog = (
+    pkg: SoftwarePackage,
+    level: SystemLogEntry["level"],
+    message: string
+  ) => {
+    const newLog: SystemLogEntry = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      timestamp: new Date().toLocaleTimeString(),
+      packageId: pkg.id,
+      packageName: pkg.name,
+      level,
+      message,
+      pid: pkg.pid || Math.floor(8000 + Math.random() * 2000),
+    };
+    setSystemLogs((prev) => [...prev, newLog]);
+  };
+
   const handleInstallPackage = (pkg: SoftwarePackage) => {
     playJarvisBeep(1200, "sine", 0.04);
+    const assignedPid = Math.floor(8000 + Math.random() * 2000);
+
+    appendSystemLog(
+      pkg,
+      "INFO",
+      `Initiating installation pipeline for ${pkg.filename} (${pkg.size})...`
+    );
 
     // Update status to installing
     setPackages((prev) =>
-      prev.map((p) => (p.id === pkg.id ? { ...p, status: "installing" } : p))
+      prev.map((p) =>
+        p.id === pkg.id
+          ? {
+              ...p,
+              status: "installing",
+              pid: assignedPid,
+              installStage: "FETCH_PKG",
+              signalState: "SIGCONT (Installing)",
+            }
+          : p
+      )
     );
 
     let current = 0;
+    const stages = ["FETCH_PKG", "VERIFY_SHA256", "UNPACK_TGZ", "DPKG_INSTALL", "POSTINST", "READY"];
+
     const interval = setInterval(() => {
       current += 20;
+      const stageIdx = Math.min(stages.length - 1, Math.floor((current / 100) * stages.length));
+      const currentStage = stages[stageIdx];
+
       setInstallProgress({ id: pkg.id, percent: current });
+
+      appendSystemLog(
+        pkg,
+        "EXEC",
+        `[Stage ${currentStage}] Progress ${current}% | PID ${assignedPid}`
+      );
+
+      setPackages((prev) =>
+        prev.map((p) => (p.id === pkg.id ? { ...p, installStage: currentStage } : p))
+      );
 
       if (current >= 100) {
         clearInterval(interval);
         setInstallProgress(null);
         playSuccessChime();
 
+        appendSystemLog(
+          pkg,
+          "SUCCESS",
+          `Installation complete for ${pkg.name}. Status set to INSTALLED [PID ${assignedPid}]`
+        );
+
         setPackages((prev) =>
-          prev.map((p) => (p.id === pkg.id ? { ...p, status: "installed" } : p))
+          prev.map((p) =>
+            p.id === pkg.id
+              ? {
+                  ...p,
+                  status: "installed",
+                  memoryMb: Math.floor(50 + Math.random() * 200),
+                  cpuLoad: parseFloat((1.5 + Math.random() * 4).toFixed(1)),
+                  signalState: "SIGCONT (Running)",
+                  installStage: "SYSTEMD_ACTIVE",
+                }
+              : p
+          )
         );
       }
-    }, 300);
+    }, 350);
   };
 
   const handleUninstallPackage = (pkg: SoftwarePackage) => {
@@ -206,21 +417,61 @@ export const ApplicationManager: React.FC = () => {
 
     playJarvisBeep(900, "sine", 0.04);
 
+    appendSystemLog(
+      pkg,
+      "WARN",
+      `Sending SIGTERM signal to PID ${pkg.pid || 8000} for package removal...`
+    );
+
     setPackages((prev) =>
-      prev.map((p) => (p.id === pkg.id ? { ...p, status: "uninstalling" } : p))
+      prev.map((p) =>
+        p.id === pkg.id
+          ? { ...p, status: "uninstalling", signalState: "SIGTERM (Stopping)" }
+          : p
+      )
     );
 
     setTimeout(() => {
+      appendSystemLog(pkg, "INFO", `Purged binary and config files at ${pkg.installPath}`);
+
       setPackages((prev) =>
-        prev.map((p) => (p.id === pkg.id ? { ...p, status: "not-installed" } : p))
+        prev.map((p) =>
+          p.id === pkg.id
+            ? {
+                ...p,
+                status: "not-installed",
+                pid: undefined,
+                memoryMb: 0,
+                cpuLoad: 0,
+                signalState: "INACTIVE",
+                installStage: "NOT_INSTALLED",
+              }
+            : p
+        )
       );
       playJarvisBeep(1400, "sine", 0.05);
     }, 800);
   };
 
+  const handleSendSignalToPackage = (pkg: SoftwarePackage, signalName: string) => {
+    playJarvisBeep(1300, "sine", 0.03);
+
+    const updatedSignal = `${signalName} (Acknowledged)`;
+    appendSystemLog(
+      pkg,
+      "SIGNAL",
+      `Manual process signal '${signalName}' dispatched to PID ${pkg.pid || 8000} (${pkg.name})`
+    );
+
+    setPackages((prev) =>
+      prev.map((p) => (p.id === pkg.id ? { ...p, signalState: updatedSignal } : p))
+    );
+  };
+
   const handleResetDefaultPackages = () => {
     if (window.confirm("Reset all software packages to default factory state?")) {
       setPackages(DEFAULT_PACKAGES);
+      setSystemLogs(INITIAL_LOGS);
       try {
         localStorage.removeItem("ud_app_manager_states");
       } catch {}
@@ -246,6 +497,17 @@ export const ApplicationManager: React.FC = () => {
     return matchesCategory && matchesSearch;
   });
 
+  const filteredLogs = systemLogs.filter((log) => {
+    const matchesLevel = logLevelFilter === "ALL" || log.level === logLevelFilter;
+    const matchesPackage = selectedLogPackageId === "ALL" || log.packageId === selectedLogPackageId;
+    const matchesSearch =
+      !logSearchQuery ||
+      log.message.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
+      log.packageName.toLowerCase().includes(logSearchQuery.toLowerCase());
+
+    return matchesLevel && matchesPackage && matchesSearch;
+  });
+
   const installedCount = packages.filter((p) => p.status === "installed").length;
 
   return (
@@ -263,221 +525,470 @@ export const ApplicationManager: React.FC = () => {
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2 font-['Space_Grotesk']">
             <Box className="w-7 h-7 text-emerald-400" />
-            <span>Software Center & Package Manager</span>
+            <span>Software Center & System Diagnostics</span>
           </h1>
           <p className="text-xs text-slate-400">
-            Install, manage, inspect, and deploy Android APK mobile binaries, Raspberry Pi 5 Debian packages, and NOVA language runtimes.
+            Install, manage, inspect, and monitor process signals & real-time installation logs for Android APKs, Pi 5 Debian packages, and NOVA runtimes.
           </p>
         </div>
 
-        <button
-          onClick={handleResetDefaultPackages}
-          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Reset Software State</span>
-        </button>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800">
-        {/* Category Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          {[
-            { id: "all", label: "All Software", count: packages.length },
-            {
-              id: "mobile-apk",
-              label: "Android APKs",
-              count: packages.filter((p) => p.category === "mobile-apk").length,
-            },
-            {
-              id: "pi5-deb",
-              label: "Pi 5 Debian (.deb)",
-              count: packages.filter((p) => p.category === "pi5-deb").length,
-            },
-            {
-              id: "nova-runtime",
-              label: "NOVA Runtimes",
-              count: packages.filter((p) => p.category === "nova-runtime").length,
-            },
-            {
-              id: "script",
-              label: "Scripts",
-              count: packages.filter((p) => p.category === "script").length,
-            },
-          ].map((cat) => (
+        {/* View Mode Switcher: Software Center vs System Diagnostics */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold">
             <button
-              key={cat.id}
               onClick={() => {
-                playJarvisBeep(1100, "sine", 0.03);
-                setActiveCategory(cat.id);
+                playJarvisBeep(1100, "sine", 0.04);
+                setActiveTab("software-center");
               }}
-              className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                activeCategory === cat.id
-                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-                  : "bg-slate-950 text-slate-400 hover:text-white border border-slate-850"
+              className={`px-3.5 py-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeTab === "software-center"
+                  ? "bg-emerald-500 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.5)] font-extrabold"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
-              <span>{cat.label}</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-slate-900/80 text-[10px]">
-                {cat.count}
-              </span>
+              <Box className="w-4 h-4" />
+              <span>Software Center</span>
             </button>
-          ))}
-        </div>
 
-        {/* Instant Search Input */}
-        <div className="relative flex items-center w-full sm:w-72">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search packages by name or developer..."
-            className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
-          />
-          {searchQuery && (
             <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2 text-slate-500 hover:text-slate-300 cursor-pointer"
+              onClick={() => {
+                playJarvisBeep(1200, "sine", 0.04);
+                setActiveTab("system-diagnostics");
+              }}
+              className={`px-3.5 py-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                activeTab === "system-diagnostics"
+                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.5)] font-extrabold"
+                  : "text-slate-400 hover:text-white"
+              }`}
             >
-              <X className="w-4 h-4" />
+              <Activity className="w-4 h-4" />
+              <span>System Diagnostics</span>
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
             </button>
-          )}
+          </div>
+
+          <button
+            onClick={handleResetDefaultPackages}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
+            title="Reset All Software States"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Reset</span>
+          </button>
         </div>
       </div>
 
-      {/* Software Packages Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPackages.map((pkg) => {
-          const isInstalled = pkg.status === "installed";
-          const isInstalling = pkg.status === "installing";
-          const isUninstalling = pkg.status === "uninstalling";
+      {/* VIEW 1: SOFTWARE CENTER */}
+      {activeTab === "software-center" && (
+        <>
+          {/* Filter & Search Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800">
+            {/* Category Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              {[
+                { id: "all", label: "All Software", count: packages.length },
+                {
+                  id: "mobile-apk",
+                  label: "Android APKs",
+                  count: packages.filter((p) => p.category === "mobile-apk").length,
+                },
+                {
+                  id: "pi5-deb",
+                  label: "Pi 5 Debian (.deb)",
+                  count: packages.filter((p) => p.category === "pi5-deb").length,
+                },
+                {
+                  id: "nova-runtime",
+                  label: "NOVA Runtimes",
+                  count: packages.filter((p) => p.category === "nova-runtime").length,
+                },
+                {
+                  id: "script",
+                  label: "Scripts",
+                  count: packages.filter((p) => p.category === "script").length,
+                },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    playJarvisBeep(1100, "sine", 0.03);
+                    setActiveCategory(cat.id);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
+                    activeCategory === cat.id
+                      ? "bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                      : "bg-slate-950 text-slate-400 hover:text-white border border-slate-850"
+                  }`}
+                >
+                  <span>{cat.label}</span>
+                  <span className="px-1.5 py-0.2 rounded-full bg-slate-900/80 text-[10px]">
+                    {cat.count}
+                  </span>
+                </button>
+              ))}
+            </div>
 
-          return (
-            <div
-              key={pkg.id}
-              className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden"
-            >
-              {/* Progress Overlay during installation */}
-              {isInstalling && (
-                <div className="absolute top-0 left-0 right-0 h-1 bg-cyan-950">
-                  <div
-                    className="h-full bg-cyan-400 transition-all duration-300"
-                    style={{
-                      width: `${
-                        installProgress?.id === pkg.id ? installProgress.percent : 40
-                      }%`,
-                    }}
-                  />
-                </div>
+            {/* Instant Search Input */}
+            <div className="relative flex items-center w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search packages by name or developer..."
+                className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               )}
+            </div>
+          </div>
 
-              {/* Package Top Header */}
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl p-2 rounded-xl bg-slate-950 border border-slate-800 shrink-0">
-                      {pkg.icon}
-                    </span>
-                    <div>
-                      <h3 className="font-bold text-white text-base leading-snug">{pkg.name}</h3>
-                      <p className="text-[11px] text-slate-400 mt-0.5">{pkg.developer}</p>
+          {/* Software Packages Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPackages.map((pkg) => {
+              const isInstalled = pkg.status === "installed";
+              const isInstalling = pkg.status === "installing";
+              const isUninstalling = pkg.status === "uninstalling";
+
+              return (
+                <div
+                  key={pkg.id}
+                  className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between space-y-4 shadow-xl relative overflow-hidden"
+                >
+                  {/* Progress Overlay during installation */}
+                  {isInstalling && (
+                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-slate-950">
+                      <div
+                        className="h-full bg-cyan-400 transition-all duration-300 shadow-[0_0_8px_#22d3ee]"
+                        style={{
+                          width: `${
+                            installProgress?.id === pkg.id ? installProgress.percent : 40
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Package Top Header */}
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl p-2 rounded-xl bg-slate-950 border border-slate-800 shrink-0">
+                          {pkg.icon}
+                        </span>
+                        <div>
+                          <h3 className="font-bold text-white text-base leading-snug">{pkg.name}</h3>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{pkg.developer}</p>
+                        </div>
+                      </div>
+
+                      {/* Status Badge */}
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 uppercase tracking-wider ${
+                          isInstalled
+                            ? "bg-emerald-950 text-emerald-300 border-emerald-800"
+                            : isInstalling
+                            ? "bg-cyan-950 text-cyan-300 border-cyan-800 animate-pulse"
+                            : isUninstalling
+                            ? "bg-rose-950 text-rose-300 border-rose-800"
+                            : "bg-slate-950 text-slate-400 border-slate-800"
+                        }`}
+                      >
+                        {isInstalling
+                          ? `INSTALLING (${installProgress?.percent || 20}%)`
+                          : isUninstalling
+                          ? "REMOVING..."
+                          : isInstalled
+                          ? "INSTALLED"
+                          : "NOT INSTALLED"}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">{pkg.description}</p>
+
+                    {/* Package Specs Pills */}
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-slate-400 pt-1">
+                      <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                        {pkg.platform}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-400">
+                        {pkg.version}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800">
+                        {pkg.size}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Status Badge */}
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 uppercase tracking-wider ${
-                      isInstalled
-                        ? "bg-emerald-950 text-emerald-300 border-emerald-800"
-                        : isInstalling
-                        ? "bg-cyan-950 text-cyan-300 border-cyan-800 animate-pulse"
-                        : isUninstalling
-                        ? "bg-rose-950 text-rose-300 border-rose-800"
-                        : "bg-slate-950 text-slate-400 border-slate-800"
-                    }`}
-                  >
-                    {isInstalling
-                      ? "INSTALLING..."
-                      : isUninstalling
-                      ? "REMOVING..."
-                      : isInstalled
-                      ? "INSTALLED"
-                      : "NOT INSTALLED"}
-                  </span>
-                </div>
+                  {/* Action Buttons Toolbar: Install, Uninstall, Status */}
+                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      {/* STATUS BUTTON */}
+                      <button
+                        onClick={() => {
+                          playJarvisBeep(1100, "sine", 0.03);
+                          setSelectedStatusPackage(pkg);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold cursor-pointer transition-all flex items-center gap-1"
+                        title="View Package Status & Diagnostic Details"
+                      >
+                        <Info className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Status</span>
+                      </button>
 
-                <p className="text-xs text-slate-300 leading-relaxed">{pkg.description}</p>
+                      {/* FILE DOWNLOAD PACKAGE BUTTON */}
+                      <a
+                        href={pkg.downloadUrl}
+                        download={pkg.filename}
+                        className="px-2 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-cyan-300 border border-slate-800 text-xs cursor-pointer transition-all"
+                        title={`Download real ${pkg.filename} file`}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
 
-                {/* Package Specs Pills */}
-                <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-slate-400 pt-1">
-                  <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300">
-                    {pkg.platform}
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-400">
-                    {pkg.version}
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800">
-                    {pkg.size}
-                  </span>
+                    {/* INSTALL / UNINSTALL BUTTONS */}
+                    <div>
+                      {isInstalled ? (
+                        <button
+                          onClick={() => handleUninstallPackage(pkg)}
+                          disabled={isUninstalling}
+                          className="px-3 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 hover:border-rose-700 text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Uninstall</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleInstallPackage(pkg)}
+                          disabled={isInstalling}
+                          className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.4)] text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>{isInstalling ? "Installing..." : "Install"}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* VIEW 2: SYSTEM DIAGNOSTICS & PROCESS SIGNALS */}
+      {activeTab === "system-diagnostics" && (
+        <div className="space-y-6">
+          {/* Per-Package Process Signals & Live Status Grid */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2 tracking-wider uppercase">
+                <Activity className="w-4 h-4 text-cyan-400" />
+                <span>Process Signals & Installation Progress Telemetry</span>
+              </h2>
+              <span className="text-xs text-slate-400">
+                Broadcom BCM2712 / Android ARM64 Target Signals
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 relative overflow-hidden"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{pkg.icon}</span>
+                      <div>
+                        <h3 className="font-bold text-white text-xs leading-snug">{pkg.name}</h3>
+                        <p className="text-[10px] text-slate-400">PID: {pkg.pid || "INACTIVE"}</p>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[9px] font-bold border uppercase ${
+                        pkg.status === "installed"
+                          ? "bg-emerald-950 text-emerald-300 border-emerald-800"
+                          : pkg.status === "installing"
+                          ? "bg-cyan-950 text-cyan-300 border-cyan-800 animate-pulse"
+                          : "bg-slate-950 text-slate-500 border-slate-800"
+                      }`}
+                    >
+                      {pkg.status}
+                    </span>
+                  </div>
+
+                  {/* Stage & Signal Indicators */}
+                  <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-850 space-y-1 text-[11px] font-mono">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>Signal State:</span>
+                      <span className="text-cyan-400 font-bold">{pkg.signalState || "INACTIVE"}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Install Stage:</span>
+                      <span className="text-amber-300 font-bold">{pkg.installStage || "READY"}</span>
+                    </div>
+
+                    {pkg.status === "installed" && (
+                      <div className="flex items-center justify-between text-slate-400 pt-1 border-t border-slate-900">
+                        <span>Memory / CPU:</span>
+                        <span className="text-emerald-400">
+                          {pkg.memoryMb || 85}MB | {pkg.cpuLoad || 1.2}% CPU
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Interactive Process Signal Dispatch Buttons */}
+                  <div className="flex items-center justify-between gap-1 text-[10px]">
+                    <button
+                      onClick={() => handleSendSignalToPackage(pkg, "SIGUSR1")}
+                      disabled={pkg.status !== "installed"}
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer disabled:opacity-40"
+                      title="Send SIGUSR1 (Health Check signal)"
+                    >
+                      SIGUSR1
+                    </button>
+                    <button
+                      onClick={() => handleSendSignalToPackage(pkg, "SIGCONT")}
+                      disabled={pkg.status !== "installed"}
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-white cursor-pointer disabled:opacity-40"
+                      title="Send SIGCONT (Resume signal)"
+                    >
+                      SIGCONT
+                    </button>
+                    <button
+                      onClick={() => handleSendSignalToPackage(pkg, "SIGTERM")}
+                      disabled={pkg.status !== "installed"}
+                      className="px-2 py-1 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 cursor-pointer disabled:opacity-40"
+                      title="Send SIGTERM (Graceful termination)"
+                    >
+                      SIGTERM
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Real-Time Live System Log Console */}
+          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-2xl">
+            {/* Console Toolbar Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-cyan-400" />
+                <span className="font-bold text-white text-xs tracking-wider">
+                  REAL-TIME SYSTEM DIAGNOSTIC LOG STREAM
+                </span>
+                <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 text-[10px]">
+                  {filteredLogs.length} LOGS
+                </span>
               </div>
 
-              {/* Action Buttons Toolbar: Install, Uninstall, Status */}
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  {/* STATUS BUTTON */}
-                  <button
-                    onClick={() => {
-                      playJarvisBeep(1100, "sine", 0.03);
-                      setSelectedStatusPackage(pkg);
-                    }}
-                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold cursor-pointer transition-all flex items-center gap-1"
-                    title="View Package Status & Diagnostic Details"
-                  >
-                    <Info className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Status</span>
-                  </button>
-
-                  {/* FILE DOWNLOAD PACKAGE BUTTON */}
-                  <a
-                    href={pkg.downloadUrl}
-                    download={pkg.filename}
-                    className="px-2 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-cyan-300 border border-slate-800 text-xs cursor-pointer transition-all"
-                    title={`Download real ${pkg.filename} file`}
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </a>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {/* Level Filter */}
+                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[10px]">
+                  {["ALL", "INFO", "EXEC", "SIGNAL", "SUCCESS", "WARN"].map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => setLogLevelFilter(lvl)}
+                      className={`px-2 py-0.5 rounded cursor-pointer font-bold ${
+                        logLevelFilter === lvl
+                          ? "bg-cyan-500 text-slate-950"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {lvl}
+                    </button>
+                  ))}
                 </div>
 
-                {/* INSTALL / UNINSTALL BUTTONS */}
-                <div>
-                  {isInstalled ? (
-                    <button
-                      onClick={() => handleUninstallPackage(pkg)}
-                      disabled={isUninstalling}
-                      className="px-3 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 hover:border-rose-700 text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Uninstall</span>
-                    </button>
+                {/* Pause / Resume Button */}
+                <button
+                  onClick={() => setIsStreamPaused((prev) => !prev)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1 ${
+                    isStreamPaused
+                      ? "bg-amber-500 text-slate-950"
+                      : "bg-slate-800 text-slate-300 hover:text-white"
+                  }`}
+                >
+                  {isStreamPaused ? (
+                    <>
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Resume Stream</span>
+                    </>
                   ) : (
-                    <button
-                      onClick={() => handleInstallPackage(pkg)}
-                      disabled={isInstalling}
-                      className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.4)] text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>{isInstalling ? "Installing..." : "Install"}</span>
-                    </button>
+                    <>
+                      <Pause className="w-3 h-3 fill-current" />
+                      <span>Pause Stream</span>
+                    </>
                   )}
-                </div>
+                </button>
+
+                {/* Clear Logs */}
+                <button
+                  onClick={() => setSystemLogs([])}
+                  className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-[10px] cursor-pointer"
+                >
+                  Clear Logs
+                </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+
+            {/* Log Stream Output Box */}
+            <div
+              ref={logContainerRef}
+              className="h-80 w-full p-4 rounded-xl bg-slate-950 border border-slate-850 overflow-y-auto font-mono text-xs leading-relaxed space-y-1.5 select-text"
+            >
+              {filteredLogs.length === 0 ? (
+                <div className="py-12 text-center text-slate-600 space-y-1">
+                  <Terminal className="w-6 h-6 mx-auto text-slate-700 mb-1" />
+                  <p>No system log entries matching current filter</p>
+                </div>
+              ) : (
+                filteredLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-2 break-all">
+                    <span className="text-slate-500 shrink-0 text-[10px] font-mono pt-0.5">
+                      [{log.timestamp}]
+                    </span>
+
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
+                        log.level === "INFO"
+                          ? "bg-sky-950 text-sky-400 border border-sky-800"
+                          : log.level === "EXEC"
+                          ? "bg-purple-950 text-purple-300 border border-purple-800"
+                          : log.level === "SIGNAL"
+                          ? "bg-amber-950 text-amber-300 border border-amber-800"
+                          : log.level === "SUCCESS"
+                          ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                          : "bg-rose-950 text-rose-300 border border-rose-800"
+                      }`}
+                    >
+                      {log.level}
+                    </span>
+
+                    <span className="text-cyan-400 font-bold shrink-0">
+                      [{log.packageName}]
+                    </span>
+
+                    <span className="text-slate-300">{log.message}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Package Status & Diagnostics Detail Modal Drawer */}
       {selectedStatusPackage && (

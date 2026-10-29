@@ -1,0 +1,36 @@
+// N.O.V.A. Language: Real-time Emotional Voice & Ollama Synchronizer
+// Handles Local Tamil (Madras/Kongu), Tanglish, Urdu, Hindi affect loops
+
+import dragon.voice as voice
+import dragon.ollama as ollama
+import dragon.cv2 as cv2
+
+fn main() {
+    println("=== NOVA EMOTIONAL VOICE & OLLAMA SYNC PROTOCOL ===")
+    
+    // 1. Configure Physiological Vocal Parameters
+    voice.configure_affect({
+        mode: "local_tamil_tanglish",
+        moochi_kathu: true,     // Inhalation & deep sighs
+        ilaipparurathu: true,   // Restful pause cadence
+        irumal: true,           // Subtle throat clearing
+        smily: true,            // Smiling acoustic inflection
+        speed: "adaptive_colloquial",
+    })
+    
+    println("[VOICE-ENGINE] Audio artifacts loaded: [moochi: active, irumal: active, smily: active]")
+    
+    // 2. Direct Sync with Local Ollama Daemon
+    println("[OLLAMA-SYNC] Connecting to Ollama custom model 'nova-dragon:latest'...")
+    let sync_res = ollama.push_voice_context({
+        model: "nova-dragon:latest",
+        context_tokens: 8192,
+        system_prompt: "You are NOVA, speaking authentic Local Madras Tamil and Tanglish to founder Aslam.",
+        physiological_cues: true,
+    })
+    
+    // 3. Connect CV2 vision pipeline
+    cv2.bind_face_detector(model: "haar_cascade_mesh_468")
+    
+    println("[SUCCESS] Voice, Ollama, and CV2 successfully synchronized in NOVA runtime.")
+}

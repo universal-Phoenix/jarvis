@@ -1,6 +1,6 @@
 import React from "react";
-import { MessageSquare, Sparkles, RefreshCw, Volume2, VolumeX, Shield, Terminal } from "lucide-react";
-import { playJarvisBeep } from "../utils/jarvisAudio";
+import { MessageSquare, Sparkles, RefreshCw, Volume2, VolumeX, Shield, Terminal, Video, Download } from "lucide-react";
+import { playJarvisBeep, playSuccessChime } from "../utils/jarvisAudio";
 
 interface NavbarProps {
   onOpenChat: () => void;
@@ -9,6 +9,8 @@ interface NavbarProps {
   brandName?: string;
   voiceEnabled: boolean;
   onToggleVoice: () => void;
+  onStartVideoCall?: () => void;
+  onOpenTerminal?: () => void;
   unreadChatCount?: number;
 }
 
@@ -19,11 +21,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   brandName,
   voiceEnabled,
   onToggleVoice,
+  onStartVideoCall,
+  onOpenTerminal,
   unreadChatCount = 0,
 }) => {
   return (
-    <header className="sticky top-0 z-40 w-full bg-slate-950/85 border-b border-cyan-900/40 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-40 w-full bg-slate-950/90 border-b border-cyan-900/40 backdrop-blur-md shrink-0">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-13 flex items-center justify-between">
         {/* Brand Logo & Name */}
         <div className="flex items-center gap-3">
           <div className="relative w-9 h-9 rounded-xl bg-slate-900 border border-cyan-400 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.4)]">
@@ -82,6 +86,46 @@ export const Navbar: React.FC<NavbarProps> = ({
             title={voiceEnabled ? "Mute N.O.V.A. Voice" : "Enable N.O.V.A. Voice"}
           >
             {voiceEnabled ? <Volume2 className="w-4 h-4 text-cyan-400" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
+          {/* Download Complete Codebase ZIP */}
+          <a
+            href="/api/download-zip"
+            download="universal-dragon-nova-suite.zip"
+            onClick={() => playSuccessChime()}
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-900 hover:bg-cyan-950 text-cyan-300 border border-slate-700 hover:border-cyan-500 transition-all cursor-pointer"
+            title="Download Complete Source Code ZIP (All Languages & Tools)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>CODE (.ZIP)</span>
+          </a>
+
+          {/* Full Access Workspace Terminal */}
+          <button
+            onClick={() => {
+              playJarvisBeep(1200, "sine", 0.04);
+              onOpenTerminal?.();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-900 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-all cursor-pointer"
+            title="Open Full Access Workspace Terminal"
+          >
+            <Terminal className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">TERMINAL</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          </button>
+
+          {/* Live AI Video Call Trigger */}
+          <button
+            onClick={() => {
+              playJarvisBeep(1400, "sine", 0.05);
+              onStartVideoCall?.();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.5)] transition-all cursor-pointer"
+            title="Start Live Face-to-Face AI Video Call with N.O.V.A."
+          >
+            <Video className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">AI VIDEO CALL</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />
           </button>
 
           {/* N.O.V.A. Chat Trigger */}

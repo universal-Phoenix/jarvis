@@ -28,16 +28,16 @@ export const ArcReactorVisualizer: React.FC<ArcReactorVisualizerProps> = ({
   }, []);
 
   return (
-    <div className="relative flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/80 border border-cyan-500/30 backdrop-blur-md hud-glow overflow-hidden">
+    <div className="relative flex flex-col sm:flex-row items-center justify-between gap-3 p-2.5 px-4 rounded-xl bg-slate-900/90 border border-cyan-500/30 backdrop-blur-md hud-glow overflow-hidden shrink-0">
       {/* Background scanline effect */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-950/20 via-transparent to-transparent pointer-events-none" />
 
       {/* Left: Arc Reactor Core & Status */}
-      <div className="flex items-center gap-4 z-10">
+      <div className="flex items-center gap-3 z-10">
         <button
           onClick={onReactorClick}
           title="Click to interact with N.O.V.A."
-          className="group relative w-16 h-16 flex items-center justify-center rounded-full bg-slate-950 border-2 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.6)] cursor-pointer transition-transform active:scale-95"
+          className="group relative w-10 h-10 flex items-center justify-center rounded-full bg-slate-950 border-2 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.6)] cursor-pointer transition-transform active:scale-95 shrink-0"
         >
           {/* Outer rotating ring */}
           <div
@@ -47,7 +47,7 @@ export const ArcReactorVisualizer: React.FC<ArcReactorVisualizerProps> = ({
 
           {/* Middle counter-rotating ring */}
           <div
-            className="absolute inset-1 rounded-full border border-cyan-500/40 border-t-transparent animate-spin"
+            className="absolute inset-0.5 rounded-full border border-cyan-500/40 border-t-transparent animate-spin"
             style={{
               animationDuration: isSpeaking ? "2s" : "8s",
               animationDirection: "reverse",
@@ -56,20 +56,15 @@ export const ArcReactorVisualizer: React.FC<ArcReactorVisualizerProps> = ({
 
           {/* Glowing central core */}
           <div
-            className={`w-7 h-7 rounded-full transition-all duration-300 flex items-center justify-center ${
+            className={`w-5 h-5 rounded-full transition-all duration-300 flex items-center justify-center ${
               isSpeaking
-                ? "bg-cyan-300 shadow-[0_0_25px_#22d3ee] scale-110"
+                ? "bg-cyan-300 shadow-[0_0_20px_#22d3ee] scale-110"
                 : isGenerating
-                ? "bg-amber-400 shadow-[0_0_25px_#f59e0b] animate-pulse"
-                : "bg-cyan-500/80 shadow-[0_0_12px_#06b6d4]"
+                ? "bg-amber-400 shadow-[0_0_20px_#f59e0b] animate-pulse"
+                : "bg-cyan-500/80 shadow-[0_0_10px_#06b6d4]"
             }`}
           >
-            <div className="w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_8px_#ffffff]" />
-          </div>
-
-          {/* Tri-blade aperture overlay */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40 group-hover:opacity-80 transition-opacity">
-            <div className="w-12 h-12 border-t-2 border-r-2 border-cyan-300 rotate-45 rounded-sm" />
+            <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_#ffffff]" />
           </div>
         </button>
 

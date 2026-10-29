@@ -12,6 +12,12 @@ import { JarvisChatDrawer } from "./components/JarvisChatDrawer";
 import { CosmicCelestialBackground } from "./components/CosmicCelestialBackground";
 import { VoiceDesignPlayground } from "./components/VoiceDesignPlayground";
 import { HuaweiPiAgentBridge } from "./components/HuaweiPiAgentBridge";
+import { AiHumanVideoCall } from "./components/AiHumanVideoCall";
+import { ThreeDimensionalDragonScene } from "./components/ThreeDimensionalDragonScene";
+import { ScienceGenomicsLab } from "./components/ScienceGenomicsLab";
+import { OmniVideoLab } from "./components/OmniVideoLab";
+import { SearchAndVoiceTranscribe } from "./components/SearchAndVoiceTranscribe";
+import { RealAccessTerminal } from "./components/RealAccessTerminal";
 import { BrandBible } from "./types/brand";
 import { VoicePersona, CelestialTheme, OFFICIAL_VOICE_PERSONAS } from "./types/voice";
 import {
@@ -30,66 +36,73 @@ import {
   Cpu,
   Layers,
   Wand2,
-  Orbit
+  Orbit,
+  Video,
+  Box,
+  Dna,
+  Film,
+  Search,
+  Radio,
+  Terminal,
 } from "lucide-react";
 
-// Initial Demo Brand for immediate pristine showcase
+// Initial Demo Brand for immediate pristine showcase: Universal Dragon by Universal Dragon Aslam
 const INITIAL_DEMO_BRAND: BrandBible = {
-  brandName: "Stark Quantum",
-  tagline: "Limitless Power. Sovereign Defense.",
+  brandName: "Universal Dragon",
+  tagline: "Sovereign AI Power. Cosmic Dragon Flight.",
   missionStatement:
-    "Pioneering compact fusion containment and autonomous clean energy grids to power humanity's multi-planetary expansion and safeguard civilization.",
+    "Empowering humanity and cosmic exploration through universal quantum intelligence, dragon-tier defense networks, and sovereign celestial power directed by Universal Dragon Aslam.",
   visionStatement:
-    "An unconstrained post-scarcity future where clean fusion energy drives sovereign defense, terraforming, and deep space infrastructure.",
+    "A unified cosmos of limitless clean power, autonomous AI agents, and interstellar enlightenment directed by Universal Dragon Aslam.",
   jarvisBriefing:
-    "Allow me to present the Stark Quantum Brand Bible, sir. The chromatic spectrum has been calibrated to our signature Arc Cyan and Tungsten Obsidian matrix. Primary and secondary marks have been mathematically balanced for orbital scale down to micro-die engraving.",
+    "Allow me to present the Universal Dragon Brand Bible, Architect Aslam. The chromatic spectrum has been calibrated to our signature Dragon Cyan, Solar Gold, and Deep Space Obsidian matrix. Primary and secondary marks have been mathematically balanced for orbital scale down to micro-die engraving.",
   valuePillars: [
     {
-      title: "Zero-Point Integrity",
-      description: "Relentless engineering perfection with tolerance thresholds calculated to subatomic precision.",
+      title: "Dragon Sovereignty",
+      description: "Unyielding technological supremacy and uncompromised cosmic autonomy.",
     },
     {
-      title: "Sovereign Stewardship",
-      description: "Deploying world-class defense shields strictly to preserve planetary equilibrium and human life.",
+      title: "Universal Intelligence",
+      description: "Deploying multi-agent quantum cognition across edge nodes and celestial clouds.",
     },
     {
-      title: "Quantum Leap Velocity",
-      description: "Refusing incrementalism in favor of paradigm-shifting technological breakthroughs.",
+      title: "Solar Force Velocity",
+      description: "Refusing incrementalism in favor of paradigm-shifting breakthroughs.",
     },
     {
-      title: "Elegance in Force",
-      description: "Form follows lethal function; aesthetic superiority married to raw kinetic capability.",
+      title: "Majesty in Form",
+      description: "Aesthetic superiority married to unstoppable computational force.",
     },
   ],
   brandVoice: {
-    archetype: "The Visionary Architect",
-    toneKeywords: ["Unapologetically Brilliant", "Aristocratic Precision", "Audacious", "Composed"],
+    archetype: "The Celestial Sovereign",
+    toneKeywords: ["Cosmic Authority", "Dragon Precision", "Audacious", "Unstoppable"],
     doRules: [
-      "Speak with calm, sovereign authority and indisputable technical accuracy.",
-      "Highlight breakthrough fusion physics, titanium alloys, and autonomous shields.",
+      "Speak with calm, sovereign authority and cosmic accuracy.",
+      "Highlight dragon-tier quantum AI, celestial lattices, and edge node autonomy.",
       "Keep sentences crisp, active, and mathematically confident.",
     ],
     dontRules: [
-      "Never sound uncertain, bureaucratic, or apologetic.",
-      "Avoid corporate buzzwords like 'synergy' or 'paradigm shift'.",
-      "Never compromise on visual clarity or high-contrast chromatic discipline.",
+      "Never sound uncertain, bureaucratic, or timid.",
+      "Avoid hollow corporate buzzwords; speak with direct sovereign power.",
+      "Never compromise on high-contrast chromatic discipline.",
     ],
   },
   palette: [
     {
-      name: "Arc Cyan",
+      name: "Dragon Cyan",
       hex: "#06B6D4",
       rgb: "rgb(6, 182, 212)",
       role: "Primary Brand Color",
-      usageNotes: "The core kinetic signature. Use on primary call-to-action elements, glowing emblems, and pivotal highlights.",
-      suggestedApplications: "Primary buttons, active indicators, hero vector accents",
+      usageNotes: "The core kinetic signature. Use on primary call-to-action elements, glowing dragon emblems, and key indicators.",
+      suggestedApplications: "Primary buttons, active indicators, hero vector dragon accents",
     },
     {
-      name: "Stark Gold",
+      name: "Solar Dragon Gold",
       hex: "#F59E0B",
       rgb: "rgb(245, 158, 11)",
       role: "Secondary Accent",
-      usageNotes: "High-value engineering tier. Use sparingly for master certifications, security badges, and premium tier distinctions.",
+      usageNotes: "High-value sovereign tier. Use for master certifications, royal crests, and premium distinctions.",
       suggestedApplications: "Certification seals, VIP indicators, luxury hardware trims",
     },
     {
@@ -101,7 +114,7 @@ const INITIAL_DEMO_BRAND: BrandBible = {
       suggestedApplications: "Main dashboard canvas, packaging exteriors, mobile app backgrounds",
     },
     {
-      name: "Titanium Slate",
+      name: "Dragon Scale Slate",
       hex: "#1E293B",
       rgb: "rgb(30, 41, 59)",
       role: "Surface & Card Container",
@@ -109,7 +122,7 @@ const INITIAL_DEMO_BRAND: BrandBible = {
       suggestedApplications: "HUD card containers, table headers, border structures",
     },
     {
-      name: "Pure Luminescence",
+      name: "Celestial Luminescence",
       hex: "#F8FAFC",
       rgb: "rgb(248, 250, 252)",
       role: "Light Text & High-Contrast",
@@ -133,7 +146,7 @@ const INITIAL_DEMO_BRAND: BrandBible = {
       rationale: "Unrivaled optical readability across high-density telemetry displays, mission documents, and mobile interfaces.",
     },
     pairingRationale:
-      "Space Grotesk commands display hierarchy with futuristic mechanical authority, while Inter provides tranquil, frictionless legibility.",
+      "Space Grotesk commands display hierarchy with futuristic sovereign authority, while Inter provides tranquil, frictionless legibility.",
     hierarchyNotes: {
       h1: "48px - 64px, Weight 700, Letter-spacing -0.02em",
       h2: "28px - 36px, Weight 600, Letter-spacing -0.01em",
@@ -143,31 +156,31 @@ const INITIAL_DEMO_BRAND: BrandBible = {
   },
   logoDesign: {
     primaryConcept: {
-      title: "Tri-Sector Arc Reactor Monogram",
+      title: "Universal Dragon Sovereign Crest",
       symbolism:
-        "Three converging energy containment arcs forming an interlocking quantum loop, signifying infinite power governed by perfect balance.",
+        "A soaring geometric cybernetic dragon embracing a quantum celestial core, signifying sovereign intelligence governed by cosmic equilibrium.",
       imagePrompt:
-        "Minimalist iconic logo mark for Stark Quantum, glowing cyan arc reactor triad geometry, vector graphic emblem on dark matte background",
+        "Minimalist iconic logo mark for Universal Dragon, majestic geometric winged dragon emblem, cyan and gold glowing cybernetic details, vector graphic emblem on dark matte background",
     },
     secondaryMarks: [
       {
-        name: "SQ Interlocking Monogram",
+        name: "UD Interlocking Monogram",
         type: "Monogram Sub-mark",
-        description: "Sharply beveled 'S' and 'Q' ligature suitable for hardware stampings and titanium chassis.",
+        description: "Sharply beveled 'U' and 'D' sovereign ligature suitable for hardware stampings and chassis.",
         useCase: "Hardware chassis, laser engraving, executive stationery",
-        symbolText: "SQ",
+        symbolText: "UD",
       },
       {
-        name: "Arc Core App Badge",
+        name: "Dragon Eye Core",
         type: "Icon Badge",
-        description: "Spherical containment node with pulsing cyan core enclosed in a hexagonal bezel.",
+        description: "Spherical containment node with pulsing cyan dragon core enclosed in a hexagonal bezel.",
         useCase: "Mobile app icons, social media avatars, software taskbar icons",
-        symbolText: "⚛",
+        symbolText: "🐉",
       },
       {
-        name: "Micro Favicon Mark",
+        name: "Celestial Crest",
         type: "Favicon & Watermark",
-        description: "Ultra-compact 16px vector dot matrix representation of the arc triad.",
+        description: "Ultra-compact 16px vector dot matrix representation of the dragon triad.",
         useCase: "Browser favicon, document corner watermarks, micro telemetry indicators",
         symbolText: "✦",
       },
@@ -175,7 +188,7 @@ const INITIAL_DEMO_BRAND: BrandBible = {
   },
   logoResolution: "2K",
   primaryLogoUrl:
-    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' width='400' height='400'><rect width='400' height='400' fill='%23080c14'/><circle cx='200' cy='200' r='140' fill='none' stroke='%2306b6d4' stroke-width='4' stroke-dasharray='12 8' opacity='0.7'/><circle cx='200' cy='200' r='100' fill='none' stroke='%2338bdf8' stroke-width='8'/><polygon points='200,90 295,255 105,255' fill='none' stroke='%23f59e0b' stroke-width='6'/><circle cx='200' cy='200' r='40' fill='%2306b6d4'/><circle cx='200' cy='200' r='20' fill='%23ffffff'/></svg>",
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' width='400' height='400'><rect width='400' height='400' fill='%23080c14'/><circle cx='200' cy='200' r='150' fill='none' stroke='%2306b6d4' stroke-width='4' stroke-dasharray='12 8' opacity='0.7'/><circle cx='200' cy='200' r='110' fill='none' stroke='%2338bdf8' stroke-width='6'/><path d='M200,70 L240,150 L330,170 L260,225 L280,310 L200,260 L120,310 L140,225 L70,170 L160,150 Z' fill='none' stroke='%23f59e0b' stroke-width='5'/><circle cx='200' cy='200' r='36' fill='%2306b6d4'/><circle cx='200' cy='200' r='18' fill='%23ffffff'/><text x='200' y='365' font-family='sans-serif' font-size='22' font-weight='bold' fill='%2338bdf8' text-anchor='middle' letter-spacing='4'>UNIVERSAL DRAGON</text></svg>",
 };
 
 export default function App() {
@@ -186,7 +199,18 @@ export default function App() {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [statusText, setStatusText] = useState("CORE SYSTEMS OPTIMAL // READY FOR DIRECTIVES");
-  const [activeView, setActiveView] = useState<"dashboard" | "voices" | "pi-agent" | "create">("dashboard");
+  const [activeView, setActiveView] = useState<
+    | "dashboard"
+    | "terminal"
+    | "3d-core"
+    | "science"
+    | "video-lab"
+    | "search-transcribe"
+    | "video-call"
+    | "voices"
+    | "pi-agent"
+    | "create"
+  >("dashboard");
 
   // User-requested Features: Dynamic Celestial background + Emotional Voice Personas
   const [celestialTheme, setCelestialTheme] = useState<CelestialTheme>("cycle");
@@ -405,7 +429,7 @@ export default function App() {
   };
 
   return (
-    <div className="relative min-h-screen text-slate-100 flex flex-col font-['Inter',sans-serif] overflow-x-hidden">
+    <div className="relative h-[100dvh] max-h-[100dvh] text-slate-100 flex flex-col font-['Inter',sans-serif] overflow-hidden select-none bg-slate-950">
       {/* 1. Dynamic Animated Celestial Background (Universe, Moon, Nebula, Sun cycle) */}
       <CosmicCelestialBackground
         currentTheme={celestialTheme}
@@ -420,10 +444,18 @@ export default function App() {
         brandName={brand?.brandName}
         voiceEnabled={voiceEnabled}
         onToggleVoice={handleToggleVoice}
+        onStartVideoCall={() => {
+          playJarvisBeep(1400, "sine", 0.05);
+          setActiveView("video-call");
+        }}
+        onOpenTerminal={() => {
+          playJarvisBeep(1200, "sine", 0.04);
+          setActiveView("terminal");
+        }}
       />
 
-      {/* Main Container */}
-      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Top Executive Control Deck: Compact Arc Reactor & Station Pill Bar */}
+      <div className="relative z-10 shrink-0 w-full max-w-7xl mx-auto px-4 sm:px-6 pt-2 pb-1 space-y-2">
         {/* N.O.V.A. Arc Reactor HUD Banner with Active Voice Tag */}
         <ArcReactorVisualizer
           isSpeaking={isSpeaking}
@@ -437,93 +469,213 @@ export default function App() {
           }}
         />
 
-        {/* View Switcher Pill Bar (All 4 Core Stations) */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Tab 1: Brand Bible */}
+        {/* View Switcher Station Bar (Official Application Station Deck) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-1 bg-slate-950/80 border border-slate-900 rounded-xl">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Tab 1: QBIT NOVA CORE */}
             <button
               onClick={() => {
                 playJarvisBeep(1100, "sine", 0.04);
                 setActiveView("dashboard");
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                 activeView === "dashboard"
-                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
-                  : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
+                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-slate-400 hover:text-white border border-slate-800"
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>BRAND BIBLE DASHBOARD</span>
+              <span>QBIT NOVA CORE</span>
             </button>
 
-            {/* Tab 2: Emotional Voices (Voice Design Playground from Screenshot) */}
+            {/* Tab: Real Full Access Terminal */}
+            <button
+              onClick={() => {
+                playJarvisBeep(1200, "sine", 0.04);
+                setActiveView("terminal");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === "terminal"
+                  ? "bg-emerald-500 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-emerald-400 hover:text-white border border-emerald-900/50"
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>TERMINAL</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            </button>
+
+            {/* Tab 2: 3D Quantum Dragon Core (Three.js) */}
+            <button
+              onClick={() => {
+                playJarvisBeep(1200, "sine", 0.04);
+                setActiveView("3d-core");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === "3d-core"
+                  ? "bg-cyan-400 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-cyan-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>3D QUANTUM CORE</span>
+            </button>
+
+            {/* Tab 3: Genomics & Structural Biology (Science Skill) */}
+            <button
+              onClick={() => {
+                playJarvisBeep(1200, "sine", 0.04);
+                setActiveView("science");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === "science"
+                  ? "bg-teal-400 text-slate-950 shadow-[0_0_12px_rgba(45,212,191,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-teal-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <Dna className="w-3.5 h-3.5" />
+              <span>GENOMICS & SCIENCE</span>
+            </button>
+
+            {/* Tab 4: Omni Video Lab (gemini-omni-1.1-flash) */}
+            <button
+              onClick={() => {
+                playJarvisBeep(1200, "sine", 0.04);
+                setActiveView("video-lab");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === "video-lab"
+                  ? "bg-indigo-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-indigo-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <Film className="w-3.5 h-3.5" />
+              <span>OMNI VIDEO LAB</span>
+            </button>
+
+            {/* Tab 5: Search & Voice Transcribe */}
+            <button
+              onClick={() => {
+                playJarvisBeep(1200, "sine", 0.04);
+                setActiveView("search-transcribe");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === "search-transcribe"
+                  ? "bg-sky-500 text-slate-950 shadow-[0_0_12px_rgba(14,165,233,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-sky-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>SEARCH & TRANSCRIBE</span>
+            </button>
+
+            {/* Tab 6: AI Human Real-time Video Call */}
+            <button
+              onClick={() => {
+                playJarvisBeep(1400, "sine", 0.05);
+                setActiveView("video-call");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === "video-call"
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.6)] font-extrabold"
+                  : "bg-slate-900/90 text-emerald-400 hover:text-white border border-emerald-900/60"
+              }`}
+            >
+              <Video className="w-3.5 h-3.5" />
+              <span>AI VIDEO CALL</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            </button>
+
+            {/* Tab 7: Emotional Voices */}
             <button
               onClick={() => {
                 playJarvisBeep(1100, "sine", 0.04);
                 setActiveView("voices");
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                 activeView === "voices"
-                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
-                  : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
+                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-slate-400 hover:text-white border border-slate-800"
               }`}
             >
               <AudioLines className="w-3.5 h-3.5" />
               <span>EMOTIONAL VOICES</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
-                7+ Personas
-              </span>
             </button>
 
-            {/* Tab 3: Raspberry Pi 5 × Huawei Pura 70 Agent */}
+            {/* Tab 8: Raspberry Pi 5 × Huawei Pura 70 Agent & Termux SSH */}
             <button
               onClick={() => {
                 playJarvisBeep(1100, "sine", 0.04);
                 setActiveView("pi-agent");
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                 activeView === "pi-agent"
-                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
-                  : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
+                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-slate-400 hover:text-white border border-slate-800"
               }`}
             >
               <Cpu className="w-3.5 h-3.5 text-rose-400" />
-              <span>PI 5 × PURA 70 AGENT</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800">
-                XMAGE Sync
-              </span>
+              <span>PI 5 × PURA 70</span>
             </button>
 
-            {/* Tab 4: Synthesize New Brand */}
+            {/* Tab 9: Synthesize New Brand */}
             <button
               onClick={() => {
                 playJarvisBeep(1100, "sine", 0.04);
                 setActiveView("create");
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                 activeView === "create"
-                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
-                  : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
+                  ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.5)] font-extrabold"
+                  : "bg-slate-900/90 text-slate-400 hover:text-white border border-slate-800"
               }`}
             >
               <Wand2 className="w-3.5 h-3.5" />
-              <span>SYNTHESIZE NEW BRAND</span>
+              <span>SYNTHESIZE NEW</span>
             </button>
           </div>
 
           <button
             onClick={() => setIsChatOpen(true)}
-            className="hidden sm:flex items-center gap-1.5 text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors"
           >
             <Bot className="w-3.5 h-3.5" />
             <span>Consult N.O.V.A. ({activeVoicePersona.title})</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
+      </div>
 
-        {/* View Content Rendering */}
+      {/* Primary Workstation Stage (Dedicated Scroll Pane - Zero Browser Window Scroll) */}
+      <main className="relative z-10 flex-1 min-h-0 w-full max-w-7xl mx-auto px-4 sm:px-6 py-2 overflow-y-auto overflow-x-hidden">
         {activeView === "create" ? (
           <BrandGeneratorForm onGenerate={handleGenerateBrand} isLoading={isLoading} />
+        ) : activeView === "terminal" ? (
+          <RealAccessTerminal brandName={brand.brandName} defaultSize="fullscreen" />
+        ) : activeView === "3d-core" ? (
+          <ThreeDimensionalDragonScene />
+        ) : activeView === "science" ? (
+          <ScienceGenomicsLab />
+        ) : activeView === "video-lab" ? (
+          <OmniVideoLab
+            brandLogoUrl={brand.primaryLogoUrl}
+            brandName={brand.brandName}
+          />
+        ) : activeView === "search-transcribe" ? (
+          <SearchAndVoiceTranscribe
+            brandName={brand.brandName}
+            onApplyTranscriptionToMission={(transcribedText) => {
+              setActiveView("create");
+              setStatusText("TRANSCRIPTION APPLIED TO MISSION STATEMENT");
+            }}
+          />
+        ) : activeView === "video-call" ? (
+          <AiHumanVideoCall
+            brand={brand}
+            activeVoicePersona={activeVoicePersona}
+            onSelectPersona={handleSelectActiveVoice}
+            onCloseCall={() => setActiveView("dashboard")}
+          />
         ) : activeView === "voices" ? (
           <VoiceDesignPlayground
             activeVoiceId={activeVoicePersona.id}
@@ -556,16 +708,18 @@ export default function App() {
         activeVoicePersona={activeVoicePersona}
       />
 
-      {/* Footer */}
-      <footer className="relative z-10 w-full border-t border-slate-900/80 bg-slate-950/60 backdrop-blur-md py-6 px-4 text-center text-xs font-mono text-slate-400">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-400" />
-            <span>NOVA QUANTUM LABS // N.O.V.A. PROTOCOL 6.1 // RASPBERRY PI 5 EDGE</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span>Powered by Gemini 3.8 Flash TTS, Gemini 3 Pro Vision & Huawei Pura 70 XMAGE</span>
-          </div>
+      {/* Official Native App Status Bar (Docked Bottom Strip - Exactly 28px height) */}
+      <footer className="relative z-10 shrink-0 h-7 border-t border-slate-900 bg-slate-950/95 backdrop-blur-md px-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+          <span className="text-slate-300 font-bold">UNIVERSAL DRAGON ARCHITECT</span>
+          <span className="text-slate-600">//</span>
+          <span className="hidden sm:inline">N.O.V.A. PROTOCOL 6.1 (ZERO-SCROLL WORKSTATION)</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-emerald-400 hidden sm:inline">OFFICIAL NATIVE SUITE</span>
+          <span className="text-slate-600">//</span>
+          <span>pi5.universaldragon.com</span>
         </div>
       </footer>
     </div>

@@ -17,12 +17,12 @@ interface BrandGeneratorFormProps {
 
 const PRESETS = [
   {
-    name: "Stark Quantum",
-    industry: "Deep Tech & Aerospace",
-    mission: "Pioneering compact fusion reactors and autonomous clean energy shields to power humanity's multi-planetary expansion.",
-    audience: "Global defense ministries, aerospace conglomerates, and visionary founders",
-    vibe: "Futuristic, Arc-Reactor Tech, Precision Engineering",
-    colors: "Arc Cyan (#06B6D4), Stark Gold, Deep Space Obsidian",
+    name: "Universal Dragon",
+    industry: "Sovereign AI & Quantum Aerospace",
+    mission: "Empowering humanity and cosmic exploration through universal quantum intelligence, dragon-tier defense networks, and sovereign celestial power directed by Universal Dragon Aslam.",
+    audience: "Visionary innovators, sovereign AI labs, aerospace pioneers, and global tech leaders",
+    vibe: "Universal Dragon, Futuristic Sovereignty, Cosmic Intelligence",
+    colors: "Dragon Cyan (#06B6D4), Solar Gold (#F59E0B), Deep Space Obsidian (#080C14)",
   },
   {
     name: "Aura Botanicals",

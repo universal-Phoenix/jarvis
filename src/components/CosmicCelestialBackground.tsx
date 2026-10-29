@@ -14,6 +14,7 @@ export const CosmicCelestialBackground: React.FC<CosmicCelestialBackgroundProps>
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [activeEra, setActiveEra] = useState<"universe" | "nebula" | "sun" | "moon">("universe");
+  const [isCosmosBarCollapsed, setIsCosmosBarCollapsed] = useState(false);
 
   // Auto-cycle through cosmos eras if theme is 'cycle'
   useEffect(() => {
@@ -189,40 +190,68 @@ export const CosmicCelestialBackground: React.FC<CosmicCelestialBackgroundProps>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(8,12,20,0.4)_100%)] pointer-events-none" />
       </div>
 
-      {/* Floating Official Celestial Theme Selector Pill */}
-      <div className="fixed bottom-4 left-4 z-40 hidden sm:flex items-center gap-1.5 p-1.5 rounded-full bg-slate-950/80 border border-cyan-800/50 backdrop-blur-xl shadow-2xl">
-        <span className="text-[10px] font-mono font-bold text-cyan-400 px-2 flex items-center gap-1">
-          <Orbit className="w-3 h-3 animate-spin [animation-duration:12s]" />
-          COSMOS:
-        </span>
+      {/* Floating Official Celestial Theme Selector - Repositioned lower down so it aligns with the footer and NEVER covers terminal commands */}
+      <div className="fixed bottom-0.5 left-2 z-20 hidden sm:flex items-center gap-1 p-0.5 rounded-full bg-slate-950/95 border border-cyan-900/60 backdrop-blur-xl shadow-lg">
+        {isCosmosBarCollapsed ? (
+          <button
+            onClick={() => {
+              playJarvisBeep(1100, "sine", 0.03);
+              setIsCosmosBarCollapsed(false);
+            }}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold text-cyan-400 hover:text-cyan-200 hover:bg-slate-900/80 cursor-pointer"
+            title="Expand Cosmos theme selector"
+          >
+            <Orbit className="w-2.5 h-2.5 animate-spin [animation-duration:12s]" />
+            <span>COSMOS: {activeEra.toUpperCase()}</span>
+            <span className="text-slate-500 text-[8px]">[+]</span>
+          </button>
+        ) : (
+          <>
+            <span className="text-[9px] font-mono font-bold text-cyan-400 px-1.5 flex items-center gap-1">
+              <Orbit className="w-2.5 h-2.5 animate-spin [animation-duration:12s]" />
+              COSMOS:
+            </span>
 
-        {[
-          { id: "cycle", label: "Auto Cycle", icon: Sparkles },
-          { id: "universe", label: "Universe", icon: Orbit },
-          { id: "nebula", label: "Nebula", icon: Eye },
-          { id: "sun", label: "Solar Core", icon: Sun },
-          { id: "moon", label: "Lunar", icon: Moon },
-        ].map((item) => {
-          const Icon = item.icon;
-          const isActive = currentTheme === item.id;
-          return (
+            {[
+              { id: "cycle", label: "Auto", icon: Sparkles },
+              { id: "universe", label: "Universe", icon: Orbit },
+              { id: "nebula", label: "Nebula", icon: Eye },
+              { id: "sun", label: "Solar", icon: Sun },
+              { id: "moon", label: "Lunar", icon: Moon },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = currentTheme === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    playJarvisBeep(1250, "sine", 0.04);
+                    onThemeChange(item.id as CelestialTheme);
+                  }}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-medium transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-cyan-500 text-slate-950 font-bold shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/80"
+                  }`}
+                >
+                  <Icon className="w-2.5 h-2.5" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+
             <button
-              key={item.id}
               onClick={() => {
-                playJarvisBeep(1250, "sine", 0.04);
-                onThemeChange(item.id as CelestialTheme);
+                playJarvisBeep(900, "sine", 0.03);
+                setIsCosmosBarCollapsed(true);
               }}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium transition-all cursor-pointer ${
-                isActive
-                  ? "bg-cyan-500 text-slate-950 font-bold shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-              }`}
+              className="px-1 text-[9px] text-slate-500 hover:text-slate-300 cursor-pointer ml-0.5"
+              title="Minimize Cosmos selector"
             >
-              <Icon className="w-3 h-3" />
-              <span>{item.label}</span>
+              −
             </button>
-          );
-        })}
+          </>
+        )}
       </div>
     </>
   );

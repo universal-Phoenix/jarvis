@@ -32,10 +32,12 @@ interface JarvisChatDrawerProps {
 }
 
 const QUICK_PROMPTS = [
+  "வா மச்சி வணக்கம்!",
+  "Hey thalaiva, Pi5 and Nova engine ready ah?",
+  "Adaab Aslam bhai jaan, status update farmayiye.",
+  "Namaste Aslam bhai, full pipeline check karo.",
   "Nova, suggest 3 alternative accent colors.",
   "Refine our mission statement to be more cinematic.",
-  "Suggest a serif Google font pairing for luxury editorial print.",
-  "Critique our brand differentiation against tech giants.",
 ];
 
 export const JarvisChatDrawer: React.FC<JarvisChatDrawerProps> = ({
